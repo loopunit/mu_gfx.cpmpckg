@@ -1,0 +1,44 @@
+{
+    "build_type": {
+        "default": "debug",
+        "description": "The CMake build type to use",
+        "choices": {
+            "debug": {
+                "short": "Debug",
+                "long": "Debug",
+                "buildType": "Debug",
+                "settings": {
+                    "CPM_INSTALL_CACHE" : "${userHome}/dev/.cpm-install-cache/x64-Debug"
+                }
+            },
+            "release": {
+                "short": "Release",
+                "long": "Release",
+                "buildType": "Release",
+                "settings": {
+                    "CPM_INSTALL_CACHE" : "${userHome}/dev/.cpm-install-cache/x64-Release"
+                }
+            }
+        }
+    },
+    "platform": {
+        "default": "win32",
+        "description": "Selects the type of platform to build for",
+        "choices": {
+            "win32": {
+                "short": "Windows",
+                "long": "Windows",
+                "settings": {
+                    "CPM_SOURCE_CACHE" : "${userHome}/dev/.cpm-cache"
+                }
+            },
+            "darwin": {
+                "short": "MacOS",
+                "long": "MacOS",
+                "settings": {
+                    "CPM_SOURCE_CACHE" : "${userHome}/dev/.cpm-cache"
+                }
+            }
+        }
+    }    
+}

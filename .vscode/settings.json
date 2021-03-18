@@ -1,0 +1,13 @@
+{
+    "cmake.cacheInit": null,
+    "cmake.generator": "Ninja",
+    "cmake.configureArgs": [
+        "-DMU_GFX_BUILD_TESTS:BOOL=on",
+        "-DCPM_DEV_ROOT:PATH=${userHome}/dev/loopunit",
+        "-Dcpmpckg_SOURCE_DIR:PATH=${userHome}/dev/loopunit/cpmpckg"
+    ],
+    "cmake.configureOnOpen": false,
+    "cmake.installPrefix": "${workspaceFolder}/out/${buildType}/install",
+    "cmake.buildDirectory": "${workspaceFolder}/out/${buildType}/build",
+    "cmake.configureOnEdit": false
+}
