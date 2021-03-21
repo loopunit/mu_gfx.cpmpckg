@@ -1,6 +1,5 @@
 #pragma once
 
-#include <framegraph/FG.h>
 #include <mu_stdlib.h>
 
 struct mu_gfx_interface

@@ -22,7 +22,7 @@ if (NOT DEFINED cpmpckg_SOURCE_DIR)
 	CPMAddPackage(
 		NAME cpmpckg
 		GITHUB_REPOSITORY loopunit/cpmpckg
-		GIT_TAG 60b9fa090fd890cc7f96481d7ac81ed449202ce0
+		GIT_TAG dc150c8889bf0535e72e1f937c853fce81f6e389
 		DOWNLOAD_ONLY true)
 
 	include(${cpmpckg_SOURCE_DIR}/cmake/add_cpm_module.cmake)
@@ -41,20 +41,14 @@ CPMAddPackage(
 
 ####
 
-CPMAddBaseModule(framegraph)
-CPMAddBaseModule(basis_universal)
 CPMAddBaseModule(glfw)
+CPMAddBaseModule(diligent_engine)
 CPMAddBaseModule(mu_stdlib)
 
 set(mu_gfx_SOURCE_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
 file(GLOB gfx_impl_headers)
 file(GLOB gfx_impl_sources)
-
-file(GLOB gfx_impl_sources2 
-	"${mu_gfx_SOURCE_ROOT}/src/glfw_vulkan/VulkanDevice2.h"
-	"${mu_gfx_SOURCE_ROOT}/src/glfw_vulkan/VulkanDevice2.cpp"
-	"${mu_gfx_SOURCE_ROOT}/src/glfw_vulkan/main.cpp")
 
 list(APPEND gfx_impl_sources ${gfx_impl_sources2})
 
@@ -72,9 +66,9 @@ target_include_directories(mu_gfx PUBLIC $<BUILD_INTERFACE:${mu_gfx_SOURCE_ROOT}
 
 target_link_libraries(mu_gfx
 	PUBLIC
-		cpm_install::glfw cpm_install::framegraph cpm_install::basis_universal cpm_install::mu_stdlib)
+		cpm_install::glfw cpm_install::diligent_engine cpm_install::mu_stdlib)
 
-set_target_properties(mu_gfx PROPERTIES CXX_STANDARD 17)
+set_target_properties(mu_gfx PROPERTIES CXX_STANDARD 20)
 
 packageProject(
 	NAME mu_gfx
