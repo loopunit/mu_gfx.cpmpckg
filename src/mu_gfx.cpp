@@ -55,6 +55,256 @@ struct mu_gfx_impl : public mu_gfx_interface
     }
     )";
 
+	struct globals
+	{
+		Diligent::RefCntAutoPtr<Diligent::IRenderDevice>	   m_pDevice;
+		Diligent::RefCntAutoPtr<Diligent::IDeviceContext>	   m_pImmediateContext;
+		Diligent::RefCntAutoPtr<Diligent::IEngineFactoryD3D12> m_pFactory;
+
+		void init()
+		{
+			Diligent::EngineD3D12CreateInfo EngineCI;
+			m_pFactory = Diligent::GetEngineFactoryD3D12();
+			m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
+		}
+
+		void destroy()
+		{
+			m_pImmediateContext.Release();
+			m_pDevice.Release();
+		}
+	};
+
+	struct window
+	{
+		GLFWwindow*										  m_window = nullptr;
+		Diligent::RefCntAutoPtr<Diligent::ISwapChain>	  m_pSwapChain;
+		Diligent::RefCntAutoPtr<Diligent::IPipelineState> m_pPSO;
+		bool											  m_is_primary = false;
+
+		void create_resources(globals* glob)
+		{
+			if (!m_pPSO)
+			{
+				// Pipeline state object encompasses configuration of all GPU stages
+
+				Diligent::GraphicsPipelineStateCreateInfo PSOCreateInfo;
+
+				// Pipeline state name is used by the engine to report issues.
+				// It is always a good idea to give objects descriptive names.
+				PSOCreateInfo.PSODesc.Name = "Simple triangle PSO";
+
+				// This is a graphics pipeline
+				PSOCreateInfo.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
+
+				// clang-format off
+				// This tutorial will render to a single render target
+				PSOCreateInfo.GraphicsPipeline.NumRenderTargets             = 1;
+				// Set render target format which is the format of the swap chain's color buffer
+				PSOCreateInfo.GraphicsPipeline.RTVFormats[0]                = m_pSwapChain->GetDesc().ColorBufferFormat;
+				// Use the depth buffer format from the swap chain
+				PSOCreateInfo.GraphicsPipeline.DSVFormat                    = m_pSwapChain->GetDesc().DepthBufferFormat;
+				// Primitive topology defines what kind of primitives will be rendered by this pipeline state
+				PSOCreateInfo.GraphicsPipeline.PrimitiveTopology            = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+				// No back face culling for this tutorial
+				PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode      = Diligent::CULL_MODE_NONE;
+				// Disable depth testing
+				PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = Diligent::False;
+				// clang-format on
+
+				Diligent::ShaderCreateInfo ShaderCI;
+				// Tell the system that the shader source code is in HLSL.
+				// For OpenGL, the engine will convert this into GLSL under the hood
+				ShaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
+				// OpenGL backend requires emulated combined HLSL texture samplers (g_Texture + g_Texture_sampler combination)
+				ShaderCI.UseCombinedTextureSamplers = true;
+				// Create a vertex shader
+				Diligent::RefCntAutoPtr<Diligent::IShader> pVS;
+				{
+					ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
+					ShaderCI.EntryPoint		 = "main";
+					ShaderCI.Desc.Name		 = "Triangle vertex shader";
+					ShaderCI.Source			 = VSSource;
+					glob->m_pDevice->CreateShader(ShaderCI, &pVS);
+				}
+
+				// Create a pixel shader
+				Diligent::RefCntAutoPtr<Diligent::IShader> pPS;
+				{
+					ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
+					ShaderCI.EntryPoint		 = "main";
+					ShaderCI.Desc.Name		 = "Triangle pixel shader";
+					ShaderCI.Source			 = PSSource;
+					glob->m_pDevice->CreateShader(ShaderCI, &pPS);
+				}
+
+				// Finally, create the pipeline state
+				PSOCreateInfo.pVS = pVS;
+				PSOCreateInfo.pPS = pPS;
+				glob->m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pPSO);
+			}
+		}
+
+		void clear(globals* glob)
+		{
+			// Set render targets before issuing any draw command.
+			// Note that Present() unbinds the back buffer if it is set as render target.
+			Diligent::ITextureView* last_backbuffer_rtv	 = m_pSwapChain->GetCurrentBackBufferRTV();
+			Diligent::ITextureView* last_depthbuffer_rtv = m_pSwapChain->GetDepthBufferDSV();
+			glob->m_pImmediateContext->SetRenderTargets(1, &last_backbuffer_rtv, last_depthbuffer_rtv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+			// Clear the back buffer
+			const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
+			// Let the engine perform required state transitions
+			glob->m_pImmediateContext->ClearRenderTarget(last_backbuffer_rtv, ClearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+			glob->m_pImmediateContext->ClearDepthStencil(last_depthbuffer_rtv, Diligent::CLEAR_DEPTH_FLAG, 1.f, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+		}
+
+		void render(globals* glob)
+		{
+			clear(glob);
+
+			// Set the pipeline state in the immediate context
+			glob->m_pImmediateContext->SetPipelineState(m_pPSO);
+
+			// Typically we should now call CommitShaderResources(), however shaders in this example don't
+			// use any resources.
+
+			Diligent::DrawAttribs drawAttrs;
+			drawAttrs.NumVertices = 3; // Render 3 vertices
+			glob->m_pImmediateContext->Draw(drawAttrs);
+		}
+
+		void present(globals* glob)
+		{
+			m_pSwapChain->Present();
+		}
+
+		void on_resize(globals* glob, int sizeX, int sizeY)
+		{
+			int display_w, display_h;
+			glfwGetFramebufferSize(m_window, &display_w, &display_h);
+			m_pSwapChain->Resize(display_w, display_h);
+			clear(glob);
+			present(glob);
+		}
+
+		void create_window(int posX, int posY, int sizeX, int sizeY)
+		{
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+			m_window = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL);
+
+			glfwSetWindowUserPointer(m_window, this);
+
+			glfwShowWindow(m_window);
+		}
+
+		void init(globals* glob)
+		{
+			Diligent::SwapChainDesc		SCDesc;
+			Diligent::Win32NativeWindow Window{glfwGetWin32Window(m_window)};
+			glob->m_pFactory->CreateSwapChainD3D12(glob->m_pDevice, glob->m_pImmediateContext, SCDesc, Diligent::FullScreenModeDesc{}, Window, &m_pSwapChain);
+		}
+
+		void destroy(globals* glob)
+		{
+			m_pSwapChain.Release();
+			m_pPSO.Release();
+		}
+
+		void destroy_window()
+		{
+			glfwDestroyWindow(m_window);
+			m_window = nullptr;
+		}
+	};
+
+	std::unique_ptr<globals>		   m_globals;
+	std::list<std::unique_ptr<window>> m_windows;
+
+	mu::leaf::result<void> init_primary_window(int posX, int posY, int sizeX, int sizeY) noexcept
+	{
+		if (!glfwInit())
+		{
+			return mu::leaf::new_error();
+			//("glfw creation failed");
+		}
+
+		m_globals		= std::make_unique<globals>();
+		auto new_window = std::make_unique<window>();
+
+		new_window->m_is_primary = true;
+		new_window->create_window(posX, posY, sizeX, sizeY);
+
+		m_globals->init();
+		new_window->init(m_globals.get());
+
+		glfwSetWindowSizeCallback(
+			new_window->m_window,
+			[](GLFWwindow* src_window, int a, int b) -> void
+			{
+				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+				wnd->on_resize(singleton()->m_globals.get(), a, b);
+			});
+
+		glfwSetWindowCloseCallback(
+			new_window->m_window,
+			[](GLFWwindow* window) -> void
+			{
+				// viewport->PlatformRequestClose = true;
+			});
+
+		m_windows.push_back(std::move(new_window));
+
+		return {};
+	}
+
+	mu::leaf::result<void> init_secondary_window(int posX, int posY, int sizeX, int sizeY) noexcept
+	{
+		auto new_window = std::make_unique<window>();
+
+		new_window->m_is_primary = true;
+		new_window->create_window(posX, posY, sizeX, sizeY);
+
+		new_window->init(m_globals.get());
+
+		glfwSetWindowSizeCallback(
+			new_window->m_window,
+			[](GLFWwindow* src_window, int a, int b) -> void
+			{
+				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+				wnd->on_resize(singleton()->m_globals.get(), a, b);
+			});
+
+		glfwSetWindowCloseCallback(
+			new_window->m_window,
+			[](GLFWwindow* src_window) -> void
+			{
+				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+				singleton()->close_secondary_window(wnd);
+			});
+
+		m_windows.push_back(std::move(new_window));
+
+		return {};
+	}
+
+	void close_secondary_window(window* wnd)
+	{
+		for (auto itor = m_windows.begin(); itor != m_windows.end(); ++itor)
+		{
+			if ((*itor).get() == wnd)
+			{
+				wnd->destroy(m_globals.get());
+				wnd->destroy_window();
+				m_windows.erase(itor);
+				break;
+			}
+		}
+	}
+
+	////
+
 	static inline mu_gfx_impl* singleton()
 	{
 		return reinterpret_cast<mu_gfx_impl*>(mu_gfx().get());
@@ -67,200 +317,66 @@ struct mu_gfx_impl : public mu_gfx_interface
 
 	virtual mu::leaf::result<void> init() noexcept
 	{
-		BOOST_LEAF_CHECK(init(100.0f, 100.0f, 1280.0f, 800.0f));
+		BOOST_LEAF_CHECK(init_primary_window(100, 100, 1280, 800));
+		BOOST_LEAF_CHECK(init_secondary_window(200, 200, 640, 480));
 		return {};
 	}
 
 	virtual mu::leaf::result<bool> pump() noexcept
 	{
 		glfwPollEvents();
-		return !glfwWindowShouldClose(m_window);
+
+		for (auto& wnd : m_windows)
+		{
+			if (wnd->m_is_primary)
+			{
+				return !glfwWindowShouldClose(wnd->m_window);
+			}
+		}
+		return true;
 	}
 
 	virtual mu::leaf::result<void> begin_frame() noexcept
 	{
-		create_resources();
+		for (auto& wnd : m_windows)
+		{
+			wnd->create_resources(m_globals.get());
+		}
+
 		return {};
 	}
 
 	virtual mu::leaf::result<void> end_frame() noexcept
 	{
-		render();
-		present();
+		for (auto& wnd : m_windows)
+		{
+			wnd->render(m_globals.get());
+		}
+
+		for (auto& wnd : m_windows)
+		{
+			wnd->present(m_globals.get());
+		}
 		return {};
 	}
 
 	virtual mu::leaf::result<void> destroy() noexcept
 	{
-		destroy_window();
+		for (auto& wnd : m_windows)
+		{
+			wnd->destroy(m_globals.get());
+		}
+
+		m_globals->destroy();
+
+		for (auto& wnd : m_windows)
+		{
+			wnd->destroy_window();
+		}
+
+		glfwTerminate();
 
 		return {};
-	}
-
-	////
-
-	GLFWwindow* m_window = nullptr;
-
-	Diligent::RefCntAutoPtr<Diligent::IRenderDevice>  m_pDevice;
-	Diligent::RefCntAutoPtr<Diligent::IDeviceContext> m_pImmediateContext;
-	Diligent::RefCntAutoPtr<Diligent::ISwapChain>	  m_pSwapChain;
-	Diligent::RefCntAutoPtr<Diligent::IPipelineState> m_pPSO;
-	bool											  m_resize_requested = false;
-
-	void show_window()
-	{
-		glfwShowWindow(m_window);
-	}
-
-	void create_resources()
-	{
-		if (!m_pPSO)
-		{
-			// Pipeline state object encompasses configuration of all GPU stages
-
-			Diligent::GraphicsPipelineStateCreateInfo PSOCreateInfo;
-
-			// Pipeline state name is used by the engine to report issues.
-			// It is always a good idea to give objects descriptive names.
-			PSOCreateInfo.PSODesc.Name = "Simple triangle PSO";
-
-			// This is a graphics pipeline
-			PSOCreateInfo.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
-
-			// clang-format off
-			// This tutorial will render to a single render target
-			PSOCreateInfo.GraphicsPipeline.NumRenderTargets             = 1;
-			// Set render target format which is the format of the swap chain's color buffer
-			PSOCreateInfo.GraphicsPipeline.RTVFormats[0]                = m_pSwapChain->GetDesc().ColorBufferFormat;
-			// Use the depth buffer format from the swap chain
-			PSOCreateInfo.GraphicsPipeline.DSVFormat                    = m_pSwapChain->GetDesc().DepthBufferFormat;
-			// Primitive topology defines what kind of primitives will be rendered by this pipeline state
-			PSOCreateInfo.GraphicsPipeline.PrimitiveTopology            = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-			// No back face culling for this tutorial
-			PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode      = Diligent::CULL_MODE_NONE;
-			// Disable depth testing
-			PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = Diligent::False;
-			// clang-format on
-
-			Diligent::ShaderCreateInfo ShaderCI;
-			// Tell the system that the shader source code is in HLSL.
-			// For OpenGL, the engine will convert this into GLSL under the hood
-			ShaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
-			// OpenGL backend requires emulated combined HLSL texture samplers (g_Texture + g_Texture_sampler combination)
-			ShaderCI.UseCombinedTextureSamplers = true;
-			// Create a vertex shader
-			Diligent::RefCntAutoPtr<Diligent::IShader> pVS;
-			{
-				ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-				ShaderCI.EntryPoint		 = "main";
-				ShaderCI.Desc.Name		 = "Triangle vertex shader";
-				ShaderCI.Source			 = VSSource;
-				m_pDevice->CreateShader(ShaderCI, &pVS);
-			}
-
-			// Create a pixel shader
-			Diligent::RefCntAutoPtr<Diligent::IShader> pPS;
-			{
-				ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-				ShaderCI.EntryPoint		 = "main";
-				ShaderCI.Desc.Name		 = "Triangle pixel shader";
-				ShaderCI.Source			 = PSSource;
-				m_pDevice->CreateShader(ShaderCI, &pPS);
-			}
-
-			// Finally, create the pipeline state
-			PSOCreateInfo.pVS = pVS;
-			PSOCreateInfo.pPS = pPS;
-			m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pPSO);
-		}
-
-		if (m_resize_requested)
-		{
-			//int w, h;
-			//glfwGetWindowSize(m_window, &w, &h);
-			int display_w, display_h;
-			glfwGetFramebufferSize(m_window, &display_w, &display_h);
-			m_pSwapChain->Resize(display_w, display_h);
-		}
-	}
-
-	void render()
-	{
-		// Set render targets before issuing any draw command.
-		// Note that Present() unbinds the back buffer if it is set as render target.
-		auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-		auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
-		m_pImmediateContext->SetRenderTargets(1, &pRTV, pDSV, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-
-		// Clear the back buffer
-		const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
-		// Let the engine perform required state transitions
-		m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-		m_pImmediateContext->ClearDepthStencil(pDSV, Diligent::CLEAR_DEPTH_FLAG, 1.f, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-
-		// Set the pipeline state in the immediate context
-		m_pImmediateContext->SetPipelineState(m_pPSO);
-
-		// Typically we should now call CommitShaderResources(), however shaders in this example don't
-		// use any resources.
-
-		Diligent::DrawAttribs drawAttrs;
-		drawAttrs.NumVertices = 3; // Render 3 vertices
-		m_pImmediateContext->Draw(drawAttrs);
-	}
-
-	void present()
-	{
-		m_pSwapChain->Present();
-	}
-
-	mu::leaf::result<void> init(int posX, int posY, int sizeX, int sizeY) noexcept
-	{
-		if (!glfwInit())
-		{
-			return mu::leaf::new_error();
-			//("glfw creation failed");
-		}
-
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		m_window = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL);
-
-		show_window();
-
-		Diligent::SwapChainDesc			SCDesc;
-		Diligent::EngineD3D12CreateInfo EngineCI;
-		auto*							pFactoryD3D12 = Diligent::GetEngineFactoryD3D12();
-
-		pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
-		Diligent::Win32NativeWindow Window{glfwGetWin32Window(m_window)};
-		pFactoryD3D12->CreateSwapChainD3D12(m_pDevice, m_pImmediateContext, SCDesc, Diligent::FullScreenModeDesc{}, Window, &m_pSwapChain);
-
-		glfwSetWindowSizeCallback(
-			m_window,
-			[](GLFWwindow* window, int a, int b) -> void
-			{
-				singleton()->m_resize_requested = true;
-			});
-
-		glfwSetWindowCloseCallback(
-			m_window,
-			[](GLFWwindow* window) -> void
-			{
-				//viewport->PlatformRequestClose = true;
-			});
-
-		return {};
-	}
-
-	void destroy_window()
-	{
-		m_pSwapChain.Release();
-		m_pPSO.Release();
-		m_pImmediateContext.Release();
-		m_pDevice.Release();
-
-		glfwDestroyWindow(m_window);
-		m_window = nullptr;
 	}
 };
 
