@@ -2,6 +2,16 @@
 
 #include <mu_stdlib.h>
 
+namespace mu
+{
+	struct gfx_error
+	{
+		struct not_specified
+		{
+		};
+	};
+}
+
 struct mu_gfx_interface
 {
 	mu_gfx_interface()			= default;

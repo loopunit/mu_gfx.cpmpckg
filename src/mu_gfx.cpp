@@ -1,5 +1,7 @@
 #include "mu_gfx_impl.h"
 
+#define NOMINMAX
+
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
 #undef APIENTRY
@@ -13,209 +15,305 @@
 #include <Graphics/GraphicsEngine/interface/SwapChain.h>
 #include <Common/interface/RefCntAutoPtr.hpp>
 
+#if USING_NUKLEAR
+#include "nuklear_renderer.h"
+#endif
+
+#include "imgui.h"
+
+////
+
+namespace mu
+{
+	struct imgui_globals
+	{
+		ImGuiContext* m_imgui = nullptr;
+
+		leaf::result<void> init() noexcept
+		{
+			if (m_imgui = ImGui::CreateContext(); m_imgui == nullptr)
+			{
+				return leaf::new_error(gfx_error::not_specified{});
+			}
+			return {};
+		}
+
+		virtual leaf::result<void> destroy() noexcept
+		{
+			if (m_imgui)
+			{
+				ImGui::DestroyContext(m_imgui);
+				m_imgui = nullptr;
+			}
+			return {};
+		}
+
+		////
+
+		virtual leaf::result<void> make_current() noexcept
+		{
+			if (m_imgui)
+			{
+				ImGui::SetCurrentContext(m_imgui);
+				return {};
+			}
+			return leaf::new_error(gfx_error::not_specified{});
+		}
+	};
+} // namespace mu
+
 struct mu_gfx_impl : public mu_gfx_interface
 {
-	static inline const char* VSSource = R"(
-    struct PSInput 
-    { 
-        float4 Pos   : SV_POSITION; 
-        float3 Color : COLOR; 
-    };
-    void main(in  uint    VertId : SV_VertexID,
-            out PSInput PSIn) 
-    {
-        float4 Pos[3];
-        Pos[0] = float4(-0.5, -0.5, 0.0, 1.0);
-        Pos[1] = float4( 0.0, +0.5, 0.0, 1.0);
-        Pos[2] = float4(+0.5, -0.5, 0.0, 1.0);
-        float3 Col[3];
-        Col[0] = float3(1.0, 0.0, 0.0); // red
-        Col[1] = float3(0.0, 1.0, 0.0); // green
-        Col[2] = float3(0.0, 0.0, 1.0); // blue
-        PSIn.Pos   = Pos[VertId];
-        PSIn.Color = Col[VertId];
-    }
-    )";
-
-	// Pixel shader simply outputs interpolated vertex color
-	static inline const char* PSSource = R"(
-    struct PSInput 
-    { 
-        float4 Pos   : SV_POSITION; 
-        float3 Color : COLOR; 
-    };
-    struct PSOutput
-    { 
-        float4 Color : SV_TARGET; 
-    };
-    void main(in  PSInput  PSIn,
-            out PSOutput PSOut)
-    {
-        PSOut.Color = float4(PSIn.Color.rgb, 1.0);
-    }
-    )";
-
 	struct globals
 	{
 		Diligent::RefCntAutoPtr<Diligent::IRenderDevice>	   m_pDevice;
 		Diligent::RefCntAutoPtr<Diligent::IDeviceContext>	   m_pImmediateContext;
 		Diligent::RefCntAutoPtr<Diligent::IEngineFactoryD3D12> m_pFactory;
+#if USING_NUKLEAR
+		nk_diligent_globals* m_nk_globals;
+#endif // #if USING_NUKLEAR
 
-		void init()
+		mu::leaf::result<void> init() noexcept
 		{
-			Diligent::EngineD3D12CreateInfo EngineCI;
-			m_pFactory = Diligent::GetEngineFactoryD3D12();
-			m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
+			try
+			{
+				Diligent::EngineD3D12CreateInfo EngineCI;
+				m_pFactory = Diligent::GetEngineFactoryD3D12();
+				m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void destroy()
+		mu::leaf::result<void> destroy() noexcept
 		{
-			m_pImmediateContext.Release();
-			m_pDevice.Release();
+			try
+			{
+				m_pImmediateContext.Release();
+				m_pDevice.Release();
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 	};
 
 	struct window
 	{
-		GLFWwindow*										  m_window = nullptr;
-		Diligent::RefCntAutoPtr<Diligent::ISwapChain>	  m_pSwapChain;
-		Diligent::RefCntAutoPtr<Diligent::IPipelineState> m_pPSO;
-		bool											  m_is_primary = false;
+		GLFWwindow*									  m_window = nullptr;
+		Diligent::RefCntAutoPtr<Diligent::ISwapChain> m_pSwapChain;
+		bool										  m_is_primary = false;
+#if USING_NUKLEAR
+		nk_diligent_context* m_nk_context = nullptr;
+#endif // #if USING_NUKLEAR
 
-		void create_resources(globals* glob)
+		mu::leaf::result<void> create_resources(globals* glob) noexcept
 		{
-			if (!m_pPSO)
+			try
 			{
-				// Pipeline state object encompasses configuration of all GPU stages
-
-				Diligent::GraphicsPipelineStateCreateInfo PSOCreateInfo;
-
-				// Pipeline state name is used by the engine to report issues.
-				// It is always a good idea to give objects descriptive names.
-				PSOCreateInfo.PSODesc.Name = "Simple triangle PSO";
-
-				// This is a graphics pipeline
-				PSOCreateInfo.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
-
-				// clang-format off
-				// This tutorial will render to a single render target
-				PSOCreateInfo.GraphicsPipeline.NumRenderTargets             = 1;
-				// Set render target format which is the format of the swap chain's color buffer
-				PSOCreateInfo.GraphicsPipeline.RTVFormats[0]                = m_pSwapChain->GetDesc().ColorBufferFormat;
-				// Use the depth buffer format from the swap chain
-				PSOCreateInfo.GraphicsPipeline.DSVFormat                    = m_pSwapChain->GetDesc().DepthBufferFormat;
-				// Primitive topology defines what kind of primitives will be rendered by this pipeline state
-				PSOCreateInfo.GraphicsPipeline.PrimitiveTopology            = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-				// No back face culling for this tutorial
-				PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode      = Diligent::CULL_MODE_NONE;
-				// Disable depth testing
-				PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = Diligent::False;
-				// clang-format on
-
-				Diligent::ShaderCreateInfo ShaderCI;
-				// Tell the system that the shader source code is in HLSL.
-				// For OpenGL, the engine will convert this into GLSL under the hood
-				ShaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
-				// OpenGL backend requires emulated combined HLSL texture samplers (g_Texture + g_Texture_sampler combination)
-				ShaderCI.UseCombinedTextureSamplers = true;
-				// Create a vertex shader
-				Diligent::RefCntAutoPtr<Diligent::IShader> pVS;
+#if USING_NUKLEAR
+				if (!m_nk_context)
 				{
-					ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-					ShaderCI.EntryPoint		 = "main";
-					ShaderCI.Desc.Name		 = "Triangle vertex shader";
-					ShaderCI.Source			 = VSSource;
-					glob->m_pDevice->CreateShader(ShaderCI, &pVS);
-				}
+					int display_w, display_h;
+					glfwGetFramebufferSize(m_window, &display_w, &display_h);
 
-				// Create a pixel shader
-				Diligent::RefCntAutoPtr<Diligent::IShader> pPS;
-				{
-					ShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-					ShaderCI.EntryPoint		 = "main";
-					ShaderCI.Desc.Name		 = "Triangle pixel shader";
-					ShaderCI.Source			 = PSSource;
-					glob->m_pDevice->CreateShader(ShaderCI, &pPS);
-				}
+					if (m_is_primary)
+					{
+						glob->m_nk_globals = nk_diligent_init_globals(glob->m_pDevice);
+					}
 
-				// Finally, create the pipeline state
-				PSOCreateInfo.pVS = pVS;
-				PSOCreateInfo.pPS = pPS;
-				glob->m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pPSO);
+					m_nk_context = nk_diligent_init(
+						glob->m_nk_globals,
+						display_w,
+						display_h,
+						m_pSwapChain->GetDesc().ColorBufferFormat,
+						m_pSwapChain->GetDesc().DepthBufferFormat,
+						1024 * 32,
+						1024 * 32 * 3);
+
+					nk_diligent_init_resources(m_nk_context, glob->m_nk_globals, glob->m_pImmediateContext);
+				}
+#endif // #if USING_NUKLEAR
 			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+			return {};
 		}
 
-		void clear(globals* glob)
+		mu::leaf::result<void> clear(globals* glob) noexcept
 		{
-			// Set render targets before issuing any draw command.
-			// Note that Present() unbinds the back buffer if it is set as render target.
-			Diligent::ITextureView* last_backbuffer_rtv	 = m_pSwapChain->GetCurrentBackBufferRTV();
-			Diligent::ITextureView* last_depthbuffer_rtv = m_pSwapChain->GetDepthBufferDSV();
-			glob->m_pImmediateContext->SetRenderTargets(1, &last_backbuffer_rtv, last_depthbuffer_rtv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+			try
+			{
+				// Set render targets before issuing any draw command.
+				// Note that Present() unbinds the back buffer if it is set as render target.
+				Diligent::ITextureView* last_backbuffer_rtv	 = m_pSwapChain->GetCurrentBackBufferRTV();
+				Diligent::ITextureView* last_depthbuffer_rtv = m_pSwapChain->GetDepthBufferDSV();
+				glob->m_pImmediateContext->SetRenderTargets(1, &last_backbuffer_rtv, last_depthbuffer_rtv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-			// Clear the back buffer
-			const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
-			// Let the engine perform required state transitions
-			glob->m_pImmediateContext->ClearRenderTarget(last_backbuffer_rtv, ClearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-			glob->m_pImmediateContext->ClearDepthStencil(last_depthbuffer_rtv, Diligent::CLEAR_DEPTH_FLAG, 1.f, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+				// Clear the back buffer
+				const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
+				// Let the engine perform required state transitions
+				glob->m_pImmediateContext->ClearRenderTarget(last_backbuffer_rtv, ClearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+				glob->m_pImmediateContext->ClearDepthStencil(last_depthbuffer_rtv, Diligent::CLEAR_DEPTH_FLAG, 1.f, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void render(globals* glob)
+		mu::leaf::result<void> render(globals* glob) noexcept
 		{
-			clear(glob);
+			BOOST_LEAF_CHECK(clear(glob));
 
-			// Set the pipeline state in the immediate context
-			glob->m_pImmediateContext->SetPipelineState(m_pPSO);
+			try
+			{
+#if USING_NUKLEAR
+				nk_diligent_render(m_nk_context, glob->m_pImmediateContext, false);
+#endif // #if USING_NUKLEAR
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
 
-			// Typically we should now call CommitShaderResources(), however shaders in this example don't
-			// use any resources.
-
-			Diligent::DrawAttribs drawAttrs;
-			drawAttrs.NumVertices = 3; // Render 3 vertices
-			glob->m_pImmediateContext->Draw(drawAttrs);
+			return {};
 		}
 
-		void present(globals* glob)
+		mu::leaf::result<void> present(globals* glob) noexcept
 		{
-			m_pSwapChain->Present();
+			try
+			{
+				m_pSwapChain->Present();
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void on_resize(globals* glob, int sizeX, int sizeY)
+		mu::leaf::result<void> on_resize(globals* glob, int sizeX, int sizeY) noexcept
 		{
-			int display_w, display_h;
-			glfwGetFramebufferSize(m_window, &display_w, &display_h);
-			m_pSwapChain->Resize(display_w, display_h);
-			clear(glob);
-			present(glob);
+			try
+			{
+				int display_w, display_h;
+				glfwGetFramebufferSize(m_window, &display_w, &display_h);
+				m_pSwapChain->Resize(display_w, display_h);
+#if USING_NUKLEAR
+				nk_diligent_resize(m_nk_context, glob->m_nk_globals, glob->m_pImmediateContext, display_w, display_h);
+#endif // #if USING_NUKLEAR
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			BOOST_LEAF_CHECK(clear(glob));
+
+			try
+			{
+#if USING_NUKLEAR
+				nk_diligent_render(m_nk_context, glob->m_pImmediateContext, true);
+#endif // #if USING_NUKLEAR
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			BOOST_LEAF_CHECK(present(glob));
+
+			return {};
 		}
 
-		void create_window(int posX, int posY, int sizeX, int sizeY)
+		mu::leaf::result<void> create_window(int posX, int posY, int sizeX, int sizeY) noexcept
 		{
-			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-			m_window = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL);
+			try
+			{
+				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+				m_window = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL);
 
-			glfwSetWindowUserPointer(m_window, this);
+				glfwSetWindowUserPointer(m_window, this);
 
-			glfwShowWindow(m_window);
+				glfwShowWindow(m_window);
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void init(globals* glob)
+		mu::leaf::result<void> init(globals* glob) noexcept
 		{
-			Diligent::SwapChainDesc		SCDesc;
-			Diligent::Win32NativeWindow Window{glfwGetWin32Window(m_window)};
-			glob->m_pFactory->CreateSwapChainD3D12(glob->m_pDevice, glob->m_pImmediateContext, SCDesc, Diligent::FullScreenModeDesc{}, Window, &m_pSwapChain);
+			try
+			{
+				Diligent::SwapChainDesc		SCDesc;
+				Diligent::Win32NativeWindow Window{glfwGetWin32Window(m_window)};
+				glob->m_pFactory->CreateSwapChainD3D12(glob->m_pDevice, glob->m_pImmediateContext, SCDesc, Diligent::FullScreenModeDesc{}, Window, &m_pSwapChain);
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void destroy(globals* glob)
+		mu::leaf::result<void> destroy(globals* glob) noexcept
 		{
-			m_pSwapChain.Release();
-			m_pPSO.Release();
+			try
+			{
+#if USING_NUKLEAR
+				nk_diligent_shutdown(m_nk_context);
+				m_nk_context = nullptr;
+#endif // #if USING_NUKLEAR
+
+				if (m_is_primary)
+				{
+#if USING_NUKLEAR
+					nk_diligent_shutdown_globals(glob->m_nk_globals);
+					glob->m_nk_globals = nullptr;
+#endif // #if USING_NUKLEAR
+				}
+
+				m_pSwapChain.Release();
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 
-		void destroy_window()
+		mu::leaf::result<void> destroy_window() noexcept
 		{
-			glfwDestroyWindow(m_window);
-			m_window = nullptr;
+			try
+			{
+				glfwDestroyWindow(m_window);
+				m_window = nullptr;
+			}
+			catch (...)
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+
+			return {};
 		}
 	};
 
@@ -224,83 +322,99 @@ struct mu_gfx_impl : public mu_gfx_interface
 
 	mu::leaf::result<void> init_primary_window(int posX, int posY, int sizeX, int sizeY) noexcept
 	{
-		if (!glfwInit())
+		try
 		{
-			return mu::leaf::new_error();
-			//("glfw creation failed");
+			m_globals		= std::make_unique<globals>();
+			auto new_window = std::make_unique<window>();
+
+			new_window->m_is_primary = true;
+			BOOST_LEAF_CHECK(new_window->create_window(posX, posY, sizeX, sizeY));
+
+			m_globals->init();
+			BOOST_LEAF_CHECK(new_window->init(m_globals.get()));
+
+			glfwSetWindowSizeCallback(
+				new_window->m_window,
+				[](GLFWwindow* src_window, int a, int b) -> void
+				{
+					auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+					wnd->on_resize(singleton()->m_globals.get(), a, b);
+				});
+
+			// glfwSetWindowCloseCallback(
+			//	new_window->m_window,
+			//	[](GLFWwindow* window) -> void
+			//	{
+			//		// viewport->PlatformRequestClose = true;
+			//	});
+
+			m_windows.push_back(std::move(new_window));
 		}
-
-		m_globals		= std::make_unique<globals>();
-		auto new_window = std::make_unique<window>();
-
-		new_window->m_is_primary = true;
-		new_window->create_window(posX, posY, sizeX, sizeY);
-
-		m_globals->init();
-		new_window->init(m_globals.get());
-
-		glfwSetWindowSizeCallback(
-			new_window->m_window,
-			[](GLFWwindow* src_window, int a, int b) -> void
-			{
-				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
-				wnd->on_resize(singleton()->m_globals.get(), a, b);
-			});
-
-		glfwSetWindowCloseCallback(
-			new_window->m_window,
-			[](GLFWwindow* window) -> void
-			{
-				// viewport->PlatformRequestClose = true;
-			});
-
-		m_windows.push_back(std::move(new_window));
+		catch (...)
+		{
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
+		}
 
 		return {};
 	}
 
 	mu::leaf::result<void> init_secondary_window(int posX, int posY, int sizeX, int sizeY) noexcept
 	{
-		auto new_window = std::make_unique<window>();
+		try
+		{
+			auto new_window			 = std::make_unique<window>();
+			new_window->m_is_primary = true;
+			BOOST_LEAF_CHECK(new_window->create_window(posX, posY, sizeX, sizeY));
 
-		new_window->m_is_primary = true;
-		new_window->create_window(posX, posY, sizeX, sizeY);
+			BOOST_LEAF_CHECK(new_window->init(m_globals.get()));
 
-		new_window->init(m_globals.get());
+			glfwSetWindowSizeCallback(
+				new_window->m_window,
+				[](GLFWwindow* src_window, int a, int b) -> void
+				{
+					auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+					wnd->on_resize(singleton()->m_globals.get(), a, b);
+				});
 
-		glfwSetWindowSizeCallback(
-			new_window->m_window,
-			[](GLFWwindow* src_window, int a, int b) -> void
-			{
-				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
-				wnd->on_resize(singleton()->m_globals.get(), a, b);
-			});
+			glfwSetWindowCloseCallback(
+				new_window->m_window,
+				[](GLFWwindow* src_window) -> void
+				{
+					auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
+					singleton()->close_secondary_window(wnd);
+				});
 
-		glfwSetWindowCloseCallback(
-			new_window->m_window,
-			[](GLFWwindow* src_window) -> void
-			{
-				auto wnd = reinterpret_cast<window*>(glfwGetWindowUserPointer(src_window));
-				singleton()->close_secondary_window(wnd);
-			});
-
-		m_windows.push_back(std::move(new_window));
+			m_windows.push_back(std::move(new_window));
+		}
+		catch (...)
+		{
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
+		}
 
 		return {};
 	}
 
-	void close_secondary_window(window* wnd)
+	mu::leaf::result<void> close_secondary_window(window* wnd) noexcept
 	{
-		for (auto itor = m_windows.begin(); itor != m_windows.end(); ++itor)
+		try
 		{
-			if ((*itor).get() == wnd)
+			for (auto itor = m_windows.begin(); itor != m_windows.end(); ++itor)
 			{
-				wnd->destroy(m_globals.get());
-				wnd->destroy_window();
-				m_windows.erase(itor);
-				break;
+				if ((*itor).get() == wnd)
+				{
+					BOOST_LEAF_CHECK(wnd->destroy(m_globals.get()));
+					BOOST_LEAF_CHECK(wnd->destroy_window());
+					m_windows.erase(itor);
+					break;
+				}
 			}
 		}
+		catch (...)
+		{
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
+		}
+
+		return {};
 	}
 
 	////
@@ -317,8 +431,21 @@ struct mu_gfx_impl : public mu_gfx_interface
 
 	virtual mu::leaf::result<void> init() noexcept
 	{
+		try
+		{
+			if (!glfwInit())
+			{
+				return mu::leaf::new_error(mu::gfx_error::not_specified{});
+			}
+		}
+		catch (...)
+		{
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
+		}
+
 		BOOST_LEAF_CHECK(init_primary_window(100, 100, 1280, 800));
 		BOOST_LEAF_CHECK(init_secondary_window(200, 200, 640, 480));
+
 		return {};
 	}
 
@@ -340,7 +467,7 @@ struct mu_gfx_impl : public mu_gfx_interface
 	{
 		for (auto& wnd : m_windows)
 		{
-			wnd->create_resources(m_globals.get());
+			BOOST_LEAF_CHECK(wnd->create_resources(m_globals.get()));
 		}
 
 		return {};
@@ -348,33 +475,48 @@ struct mu_gfx_impl : public mu_gfx_interface
 
 	virtual mu::leaf::result<void> end_frame() noexcept
 	{
-		for (auto& wnd : m_windows)
+		try
 		{
-			wnd->render(m_globals.get());
+			for (auto& wnd : m_windows)
+			{
+				BOOST_LEAF_CHECK(wnd->render(m_globals.get()));
+			}
+
+			for (auto& wnd : m_windows)
+			{
+				BOOST_LEAF_CHECK(wnd->present(m_globals.get()));
+			}
+		}
+		catch (...)
+		{
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
 		}
 
-		for (auto& wnd : m_windows)
-		{
-			wnd->present(m_globals.get());
-		}
 		return {};
 	}
 
 	virtual mu::leaf::result<void> destroy() noexcept
 	{
-		for (auto& wnd : m_windows)
+		try
 		{
-			wnd->destroy(m_globals.get());
+			for (auto& wnd : m_windows)
+			{
+				BOOST_LEAF_CHECK(wnd->destroy(m_globals.get()));
+			}
+
+			BOOST_LEAF_CHECK(m_globals->destroy());
+
+			for (auto& wnd : m_windows)
+			{
+				BOOST_LEAF_CHECK(wnd->destroy_window());
+			}
+
+			glfwTerminate();
 		}
-
-		m_globals->destroy();
-
-		for (auto& wnd : m_windows)
+		catch (...)
 		{
-			wnd->destroy_window();
+			return mu::leaf::new_error(mu::gfx_error::not_specified{});
 		}
-
-		glfwTerminate();
 
 		return {};
 	}

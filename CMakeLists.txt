@@ -44,6 +44,7 @@ CPMAddPackage(
 CPMAddBaseModule(glfw)
 CPMAddBaseModule(diligent_engine)
 CPMAddBaseModule(mu_stdlib)
+CPMAddBaseModule(imgui)
 
 set(mu_gfx_SOURCE_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
@@ -56,6 +57,8 @@ file(GLOB gfx_headers
 	"${mu_gfx_SOURCE_ROOT}/include/*.h")
 
 file(GLOB gfx_sources
+	"${mu_gfx_SOURCE_ROOT}/src/nuklear_renderer.cpp"
+	"${mu_gfx_SOURCE_ROOT}/src/nuklear_renderer.h"
 	"${mu_gfx_SOURCE_ROOT}/src/mu_gfx.cpp"
 	"${mu_gfx_SOURCE_ROOT}/src/mu_gfx_impl.h")
 
@@ -66,7 +69,7 @@ target_include_directories(mu_gfx PUBLIC $<BUILD_INTERFACE:${mu_gfx_SOURCE_ROOT}
 
 target_link_libraries(mu_gfx
 	PUBLIC
-		cpm_install::glfw cpm_install::diligent_engine cpm_install::mu_stdlib)
+		cpm_install::glfw cpm_install::diligent_engine cpm_install::mu_stdlib cpm_install::imgui)
 
 set_target_properties(mu_gfx PROPERTIES CXX_STANDARD 20)
 
