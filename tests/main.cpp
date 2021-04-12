@@ -9,7 +9,7 @@ auto update_window(std::shared_ptr<mu::gfx_window>& wnd) noexcept -> mu::leaf::r
 	if (!wants_to_close)
 	{
 		MU_LEAF_AUTO(renderer, wnd->begin_window());
-		MU_LEAF_CHECK(renderer->test());	
+		MU_LEAF_CHECK(renderer->test());
 	}
 	else
 	{

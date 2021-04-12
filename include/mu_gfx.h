@@ -30,6 +30,9 @@ namespace mu
 {
 	struct gfx_renderer
 	{
+		gfx_renderer()			= default;
+		virtual ~gfx_renderer() = default;
+
 		virtual auto test() noexcept -> mu::leaf::result<void> = 0;
 	};
 

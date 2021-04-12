@@ -11,6 +11,14 @@
 
 #include "mu_diligent.h"
 
+#include <foonathan/memory/container.hpp>
+#include <foonathan/memory/memory_pool.hpp>
+#include <foonathan/memory/memory_stack.hpp>
+#include <foonathan/memory/smart_ptr.hpp>
+#include <foonathan/memory/static_allocator.hpp>
+#include <foonathan/memory/temporary_allocator.hpp>
+#include <foonathan/memory/namespace_alias.hpp>
+
 namespace mu
 {
 	namespace details
@@ -66,8 +74,19 @@ namespace mu
 	{
 		struct gfx_window_impl : public gfx_window
 		{
+			using frame_stack = memory::memory_stack<>;
+
 			struct gfx_renderer_impl : public gfx_renderer
 			{
+				std::shared_ptr<frame_stack> m_frame_stack;
+				frame_stack::marker			 m_frame_stack_top;
+
+				gfx_renderer_impl(std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top) : m_frame_stack(fs), m_frame_stack_top(fs_top) { }
+
+				virtual ~gfx_renderer_impl()
+				{
+				}
+
 				std::shared_ptr<gfx_window_impl>  m_self_window;
 				std::shared_ptr<diligent_globals> m_renderer_globals;
 				std::shared_ptr<diligent_window>  m_diligent_window;
@@ -97,11 +116,11 @@ namespace mu
 				}
 			};
 
-			gfx_renderer_impl m_renderer_impl; // TODO: this needs to come from a pool or anywhere not tied to this destructor
-
 			std::shared_ptr<glfw_system> m_glfw_system;
 			GLFWwindow*					 m_window = nullptr;
 
+			std::shared_ptr<frame_stack>	  m_frame_stack;
+			frame_stack::marker				  m_frame_stack_top;
 			std::shared_ptr<diligent_window>  m_diligent_window;
 			std::shared_ptr<diligent_globals> m_renderer_globals;
 
@@ -146,7 +165,10 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 
-			gfx_window_impl(std::shared_ptr<glfw_system> sys, int posX, int posY, int sizeX, int sizeY) : m_glfw_system(sys)
+			gfx_window_impl(std::shared_ptr<glfw_system> sys, int posX, int posY, int sizeX, int sizeY)
+				: m_glfw_system(sys)
+				, m_frame_stack(std::make_unique<frame_stack>(4096))
+				, m_frame_stack_top(m_frame_stack->top())
 			{
 				MU_LEAF_AUTO_THROW(new_window, create_window(posX, posY, sizeX, sizeY));
 				glfwSetWindowUserPointer(new_window, this);
@@ -197,10 +219,10 @@ namespace mu
 			{
 				try
 				{
-					auto renderer_impl = static_cast<gfx_renderer_impl*>(r);
-					renderer_impl->m_diligent_window.reset();
-					renderer_impl->m_renderer_globals.reset();
-					renderer_impl->m_self_window.reset();
+					auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
+					auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
+					r->~gfx_renderer();
+					stack_ref->unwind(stack_top);
 				}
 				catch (...)
 				{
@@ -210,7 +232,7 @@ namespace mu
 
 			virtual auto begin_window() noexcept -> mu::leaf::result<renderer_ref>
 			{
-				if (!m_renderer_impl.m_self_window) [[likely]]
+				if (m_frame_stack->top() == m_frame_stack_top) [[likely]]
 				{
 					if (!m_renderer_globals) [[unlikely]]
 					{
@@ -234,13 +256,17 @@ namespace mu
 						if (m_diligent_window) [[likely]]
 						{
 							// TODO: pull from pool
-							m_renderer_impl.m_self_window	   = static_pointer_cast<gfx_window_impl>(shared_self());
-							m_renderer_impl.m_renderer_globals = m_renderer_globals;
-							m_renderer_impl.m_diligent_window  = m_diligent_window;
+							auto stack_root = m_frame_stack->top();
+							auto impl_mem = m_frame_stack->allocate(sizeof(gfx_renderer_impl), 64);
+							auto impl_ptr = new(impl_mem) gfx_renderer_impl(m_frame_stack, m_frame_stack_top);
 
-							MU_LEAF_CHECK(m_renderer_impl.begin());
+							impl_ptr->m_self_window	   = static_pointer_cast<gfx_window_impl>(shared_self());
+							impl_ptr->m_renderer_globals = m_renderer_globals;
+							impl_ptr->m_diligent_window  = m_diligent_window;
 
-							return renderer_ref(&m_renderer_impl, release_renderer);
+							MU_LEAF_CHECK(impl_ptr->begin());
+
+							return renderer_ref(impl_ptr, release_renderer);
 						}
 						else
 						{
@@ -254,6 +280,7 @@ namespace mu
 				}
 				else
 				{
+					// There was a renderer already in flight
 					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 				}
 			}

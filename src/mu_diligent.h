@@ -20,15 +20,7 @@ namespace mu
 		{
 			Diligent::EngineD3D12CreateInfo EngineCI;
 			m_pFactory = Diligent::GetEngineFactoryD3D12();
-			try
-			{
-				m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
-			}
-			catch (...)
-			{
-				m_pFactory.Release();
-				throw MU_LEAF_EXCEPTION(mu::gfx_error::not_specified{});
-			}
+			m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
 		}
 
 		~diligent_globals()
@@ -39,9 +31,8 @@ namespace mu
 			}
 			catch (...)
 			{
-				// TODO: report
+				MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
 			}
-			// TODO: exception will be re-thrown
 
 			try
 			{
@@ -49,9 +40,8 @@ namespace mu
 			}
 			catch (...)
 			{
-				// TODO: report
+				MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
 			}
-			// TODO: exception will be re-thrown
 
 			try
 			{
@@ -59,9 +49,8 @@ namespace mu
 			}
 			catch (...)
 			{
-				// TODO: report
+				MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
 			}
-			// TODO: exception will be re-thrown
 		}
 	};
 
@@ -107,12 +96,6 @@ namespace mu
 		catch (...)
 		{
 			return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
-		}
-
-		auto render() noexcept -> mu::leaf::result<void>
-		{
-			MU_LEAF_CHECK(clear());
-			return {};
 		}
 
 		auto present() noexcept -> mu::leaf::result<void>
