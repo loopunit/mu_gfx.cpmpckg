@@ -83,9 +83,23 @@ namespace mu
 
 				gfx_renderer_impl(std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top) : m_frame_stack(fs), m_frame_stack_top(fs_top) { }
 
-				virtual ~gfx_renderer_impl()
+				static inline void release(gfx_renderer* r) noexcept
 				{
+					try
+					{
+						auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
+						auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
+						r->~gfx_renderer();
+						stack_ref->unwind(stack_top);
+					}
+					catch (...)
+					{
+						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
+						return;
+					}
 				}
+
+				virtual ~gfx_renderer_impl() { }
 
 				std::shared_ptr<gfx_window_impl>  m_self_window;
 				std::shared_ptr<diligent_globals> m_renderer_globals;
@@ -215,21 +229,6 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 
-			static void release_renderer(gfx_renderer* r) noexcept
-			{
-				try
-				{
-					auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
-					auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
-					r->~gfx_renderer();
-					stack_ref->unwind(stack_top);
-				}
-				catch (...)
-				{
-					return MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-				}
-			}
-
 			virtual auto begin_window() noexcept -> mu::leaf::result<renderer_ref>
 			{
 				if (m_frame_stack->top() == m_frame_stack_top) [[likely]]
@@ -255,18 +254,17 @@ namespace mu
 
 						if (m_diligent_window) [[likely]]
 						{
-							// TODO: pull from pool
 							auto stack_root = m_frame_stack->top();
-							auto impl_mem = m_frame_stack->allocate(sizeof(gfx_renderer_impl), 64);
-							auto impl_ptr = new(impl_mem) gfx_renderer_impl(m_frame_stack, m_frame_stack_top);
+							auto impl_mem	= m_frame_stack->allocate(sizeof(gfx_renderer_impl), 64);
+							auto impl_ptr	= new (impl_mem) gfx_renderer_impl(m_frame_stack, m_frame_stack_top);
 
-							impl_ptr->m_self_window	   = static_pointer_cast<gfx_window_impl>(shared_self());
+							impl_ptr->m_self_window		 = static_pointer_cast<gfx_window_impl>(shared_self());
 							impl_ptr->m_renderer_globals = m_renderer_globals;
-							impl_ptr->m_diligent_window  = m_diligent_window;
+							impl_ptr->m_diligent_window	 = m_diligent_window;
 
 							MU_LEAF_CHECK(impl_ptr->begin());
 
-							return renderer_ref(impl_ptr, release_renderer);
+							return renderer_ref(impl_ptr, gfx_renderer_impl::release);
 						}
 						else
 						{
