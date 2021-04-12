@@ -57,10 +57,8 @@ file(GLOB gfx_headers
 	"${mu_gfx_SOURCE_ROOT}/include/*.h")
 
 file(GLOB gfx_sources
-	"${mu_gfx_SOURCE_ROOT}/src/imgui_renderer.cpp"
-	"${mu_gfx_SOURCE_ROOT}/src/imgui_renderer.h"
-	"${mu_gfx_SOURCE_ROOT}/src/mu_gfx.cpp"
-	"${mu_gfx_SOURCE_ROOT}/src/mu_gfx_impl.h")
+	"${mu_gfx_SOURCE_ROOT}/src/*.cpp"
+	"${mu_gfx_SOURCE_ROOT}/src/*.h")
 
 add_library(mu_gfx STATIC ${gfx_sources} ${gfx_impl_sources} ${gfx_headers} ${gfx_impl_headers})
 

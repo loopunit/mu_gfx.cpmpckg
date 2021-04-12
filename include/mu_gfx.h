@@ -6,44 +6,64 @@ namespace mu
 {
 	struct gfx_error
 	{
-		struct not_specified
+		struct not_specified : common_error
 		{
 		};
 	};
+
+	static inline auto only_gfx_error_handlers = std::make_tuple(
+		[](gfx_error::not_specified x, leaf::e_source_location sl)
+		{
+			debug::logger()->stderr_logger()->log(spdlog::level::err, "{0} :: {1} -> {2} : gfx_error :: not_specified", sl.line, sl.file, sl.function);
+		});
+
+	static inline auto gfx_error_handlers = std::tuple_cat(error_handlers, only_gfx_error_handlers);
+
+	template<class TryBlock>
+	constexpr inline auto gfx_try_handle(TryBlock&& try_block) -> typename std::decay<decltype(std::declval<TryBlock>()().value())>::type
+	{
+		return leaf::try_handle_all(try_block, gfx_error_handlers);
+	}
 } // namespace mu
 
-struct mu_gfx_window
+namespace mu
 {
-	mu_gfx_window()			 = default;
-	virtual ~mu_gfx_window() = default;
+	struct gfx_renderer
+	{
+		virtual auto test() noexcept -> mu::leaf::result<void> = 0;
+	};
 
-	virtual mu::leaf::result<bool> wants_to_close() noexcept = 0;
-	virtual mu::leaf::result<void> show() noexcept			 = 0;
-};
+	struct gfx_window : public std::enable_shared_from_this<gfx_window>
+	{
+		using renderer_ref = std::unique_ptr<gfx_renderer, std::function<void(gfx_renderer*)>>;
 
-struct mu_gfx_renderer
-{
-	std::shared_ptr<mu_gfx_window> m_window;
-	static void					   release(mu_gfx_renderer* r) noexcept;
+		gfx_window()		  = default;
+		virtual ~gfx_window() = default;
 
-	mu::leaf::result<void> draw_test() noexcept;
-};
+		virtual auto wants_to_close() noexcept -> mu::leaf::result<bool>	   = 0;
+		virtual auto show() noexcept -> mu::leaf::result<void>				   = 0;
+		virtual auto begin_window() noexcept -> mu::leaf::result<renderer_ref> = 0;
 
-using mu_gfx_renderer_ref = std::unique_ptr<mu_gfx_renderer, decltype(&mu_gfx_renderer::release)>;
+	protected:
+		std::shared_ptr<gfx_window> shared_self() noexcept
+		{
+			return shared_from_this();
+		}
+	};
 
-struct mu_gfx_interface
-{
-	mu_gfx_interface()			= default;
-	virtual ~mu_gfx_interface() = default;
+	namespace details
+	{
+		struct gfx_interface
+		{
+			gfx_interface()			 = default;
+			virtual ~gfx_interface() = default;
 
-	virtual mu::leaf::result<void> select_platform() noexcept = 0;
-	virtual mu::leaf::result<void> init() noexcept			  = 0;
-	virtual mu::leaf::result<void> pump() noexcept			  = 0;
-	virtual mu::leaf::result<void> destroy() noexcept		  = 0;
+			virtual auto select_platform() noexcept -> leaf::result<bool>																 = 0;
+			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>> = 0;
+			virtual auto pump() noexcept -> mu::leaf::result<void>																		 = 0;
+			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;
+		};
+	} // namespace details
 
-	virtual mu::leaf::result<std::shared_ptr<mu_gfx_window>> open_window(int posX, int posY, int sizeX, int sizeY) noexcept = 0;
-	virtual mu::leaf::result<mu_gfx_renderer_ref>			 begin_window(std::shared_ptr<mu_gfx_window> h) noexcept		= 0;
-	virtual mu::leaf::result<void>							 present() noexcept												= 0;
-};
-
-using mu_gfx = mu::exported_singleton<mu::virtual_singleton<mu_gfx_interface>>;
+	using gfx = exported_singleton<virtual_singleton<details::gfx_interface>>;
+} // namespace mu
