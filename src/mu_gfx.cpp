@@ -19,6 +19,8 @@
 #include <foonathan/memory/temporary_allocator.hpp>
 #include <foonathan/memory/namespace_alias.hpp>
 
+#include "imgui_renderer.h"
+
 namespace mu
 {
 	namespace details
@@ -72,43 +74,110 @@ namespace mu
 {
 	namespace details
 	{
+		struct imgui_context
+		{
+			std::shared_ptr<diligent_window>				 m_diligent_window;
+			std::shared_ptr<ImGuiContext>					 m_imgui_context;
+			std::shared_ptr<Diligent::ImGuiDiligentRenderer> m_imgui_renderer;
+
+			imgui_context(std::shared_ptr<diligent_window> diligent_window) : m_diligent_window(diligent_window), m_imgui_context(ImGui::CreateContext(), ImGui::DestroyContext)
+			{
+				const auto& swapchain_desc = m_diligent_window->m_pSwapChain->GetDesc();
+
+				ImGui::SetCurrentContext(m_imgui_context.get());
+
+				m_imgui_renderer = std::make_shared<Diligent::ImGuiDiligentRenderer>(
+					m_diligent_window->m_globals->m_pDevice,
+					swapchain_desc.ColorBufferFormat,
+					swapchain_desc.DepthBufferFormat,
+					1024 * 1024,
+					1024 * 1024);
+			}
+
+			~imgui_context()
+			{
+				try
+				{
+					m_imgui_renderer.reset();
+				}
+				catch (...)
+				{
+					MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
+				}
+
+				try
+				{
+					m_imgui_context.reset();
+				}
+				catch (...)
+				{
+					MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
+				}
+
+				try
+				{
+					m_diligent_window.reset();
+				}
+				catch (...)
+				{
+					MU_LEAF_LOG_ERROR(mu::gfx_error::not_specified{});
+				}
+			}
+		};
+
 		struct gfx_window_impl : public gfx_window
 		{
 			using frame_stack = memory::memory_stack<>;
 
 			struct gfx_renderer_impl : public gfx_renderer
 			{
-				std::shared_ptr<frame_stack> m_frame_stack;
-				frame_stack::marker			 m_frame_stack_top;
-
-				gfx_renderer_impl(std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top) : m_frame_stack(fs), m_frame_stack_top(fs_top) { }
-
-				static inline void release(gfx_renderer* r) noexcept
-				{
-					try
-					{
-						auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
-						auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
-						r->~gfx_renderer();
-						stack_ref->unwind(stack_top);
-					}
-					catch (...)
-					{
-						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-						return;
-					}
-				}
-
-				virtual ~gfx_renderer_impl() { }
+				std::shared_ptr<imgui_context> m_imgui_context;
+				std::shared_ptr<frame_stack>   m_frame_stack;
+				frame_stack::marker			   m_frame_stack_top;
 
 				std::shared_ptr<gfx_window_impl>  m_self_window;
 				std::shared_ptr<diligent_globals> m_renderer_globals;
 				std::shared_ptr<diligent_window>  m_diligent_window;
 
+				gfx_renderer_impl(std::shared_ptr<imgui_context> ic, std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top)
+					: m_imgui_context(ic)
+					, m_frame_stack(fs)
+					, m_frame_stack_top(fs_top)
+				{ }
+
+				static inline void release(gfx_renderer* r) noexcept
+				try
+				{
+					if (auto res = r->end_frame(); !res) [[unlikely]]
+					{
+						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
+					}
+
+					auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
+					auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
+					r->~gfx_renderer();
+					stack_ref->unwind(stack_top);
+				}
+				catch (...)
+				{
+					MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
+					return;
+				}
+
+				virtual ~gfx_renderer_impl() { }
+
 				virtual auto test() noexcept -> mu::leaf::result<void>
 				{
-					return {};
-					// return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+					try
+					{
+						ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+						ImGui::ShowDemoWindow();
+						return {};
+					}
+					catch (...)
+					{
+						return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+					}
 				}
 
 				auto begin() noexcept -> mu::leaf::result<void>
@@ -126,7 +195,29 @@ namespace mu
 					m_diligent_window->create_resources(display_w, display_h);
 					m_diligent_window->clear();
 
+					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+
+					ImGuiIO& io	   = ImGui::GetIO();
+					io.DisplaySize = ImVec2(float(display_w), float(display_h));
+
+					m_imgui_context->m_imgui_renderer->NewFrame(display_w, display_h, Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL);
+					ImGui::NewFrame();
+
 					return {};
+				}
+
+				virtual auto end_frame() noexcept -> mu::leaf::result<void>
+				try
+				{
+					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+					ImGui::Render();
+					m_imgui_context->m_imgui_renderer->RenderDrawData(m_renderer_globals->m_pImmediateContext, ImGui::GetDrawData());
+					ImGui::EndFrame();
+					return {};
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 				}
 			};
 
@@ -137,6 +228,7 @@ namespace mu
 			frame_stack::marker				  m_frame_stack_top;
 			std::shared_ptr<diligent_window>  m_diligent_window;
 			std::shared_ptr<diligent_globals> m_renderer_globals;
+			std::shared_ptr<imgui_context>	  m_imgui_context;
 
 			auto create_window(int posX, int posY, int sizeX, int sizeY) noexcept -> leaf::result<GLFWwindow*>
 			try
@@ -191,6 +283,11 @@ namespace mu
 
 			virtual ~gfx_window_impl()
 			{
+				if (m_imgui_context) [[likely]]
+				{
+					m_imgui_context.reset();
+				}
+
 				if (m_diligent_window) [[likely]]
 				{
 					m_diligent_window.reset();
@@ -245,6 +342,7 @@ namespace mu
 							try
 							{
 								m_diligent_window = std::make_shared<diligent_window>(Diligent::Win32NativeWindow{glfwGetWin32Window(m_window)}, m_renderer_globals);
+								m_imgui_context	  = std::make_shared<imgui_context>(m_diligent_window);
 							}
 							catch (...)
 							{
@@ -256,7 +354,7 @@ namespace mu
 						{
 							auto stack_root = m_frame_stack->top();
 							auto impl_mem	= m_frame_stack->allocate(sizeof(gfx_renderer_impl), 64);
-							auto impl_ptr	= new (impl_mem) gfx_renderer_impl(m_frame_stack, m_frame_stack_top);
+							auto impl_ptr	= new (impl_mem) gfx_renderer_impl(m_imgui_context, m_frame_stack, m_frame_stack_top);
 
 							impl_ptr->m_self_window		 = static_pointer_cast<gfx_window_impl>(shared_self());
 							impl_ptr->m_renderer_globals = m_renderer_globals;

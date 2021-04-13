@@ -33,7 +33,8 @@ namespace mu
 		gfx_renderer()			= default;
 		virtual ~gfx_renderer() = default;
 
-		virtual auto test() noexcept -> mu::leaf::result<void> = 0;
+		virtual auto test() noexcept -> mu::leaf::result<void>		= 0;
+		virtual auto end_frame() noexcept -> mu::leaf::result<void> = 0;
 	};
 
 	struct gfx_window : public std::enable_shared_from_this<gfx_window>
