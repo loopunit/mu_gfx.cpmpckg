@@ -396,6 +396,49 @@ namespace mu
 	{
 		struct gfx_impl : public gfx_interface
 		{
+			using frame_stack = memory::memory_stack<>;
+
+			struct pumper_impl : public gfx_pumper
+			{
+				std::shared_ptr<frame_stack> m_frame_stack;
+				frame_stack::marker			 m_frame_stack_top;
+
+				pumper_impl(std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top) : m_frame_stack(fs), m_frame_stack_top(fs_top) { }
+
+				static inline void release(gfx_pumper* r) noexcept
+				try
+				{
+					if (auto res = r->present(); !res) [[unlikely]]
+					{
+						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
+					}
+
+					auto stack_ref = ((pumper_impl*)r)->m_frame_stack;
+					auto stack_top = ((pumper_impl*)r)->m_frame_stack_top;
+					r->~gfx_pumper();
+					stack_ref->unwind(stack_top);
+				}
+				catch (...)
+				{
+					MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
+					return;
+				}
+
+				virtual ~pumper_impl() { }
+
+				virtual auto present() noexcept -> mu::leaf::result<void>
+				try
+				{
+					return gfx()->present();
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
+				}
+			};
+
+			std::shared_ptr<frame_stack>				m_frame_stack;
+			frame_stack::marker							m_frame_stack_top;
 			std::weak_ptr<glfw_system>					m_glfw_system;
 			std::vector<std::weak_ptr<gfx_window_impl>> m_windows;
 
@@ -409,7 +452,7 @@ namespace mu
 				return system_ref;
 			}
 
-			gfx_impl() { }
+			gfx_impl() : m_frame_stack(std::make_unique<frame_stack>(4096)), m_frame_stack_top(m_frame_stack->top()) { }
 
 			virtual ~gfx_impl() { }
 
@@ -436,13 +479,23 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 			}
 
-			virtual auto pump() noexcept -> mu::leaf::result<void>
+			virtual auto pump() noexcept -> mu::leaf::result<pumper_ref>
 			try
 			{
 				if (!m_glfw_system.expired()) [[likely]]
 				{
-					glfwPollEvents();
-					return {};
+					if (m_frame_stack->top() == m_frame_stack_top) [[likely]]
+					{
+						auto stack_root = m_frame_stack->top();
+						auto impl_mem	= m_frame_stack->allocate(sizeof(pumper_impl), 64);
+						auto impl_ptr	= new (impl_mem) pumper_impl(m_frame_stack, m_frame_stack_top);
+						glfwPollEvents();
+						return pumper_ref(impl_ptr, pumper_impl::release);
+					}
+					else
+					{
+						return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
+					}
 				}
 				else
 				{

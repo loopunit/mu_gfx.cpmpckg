@@ -2,19 +2,28 @@
 
 static auto all_error_handlers = std::tuple_cat(mu::error_handlers, mu::only_gfx_error_handlers);
 
-auto update_window(std::shared_ptr<mu::gfx_window>& wnd) noexcept -> mu::leaf::result<void>
+auto update_window(std::shared_ptr<mu::gfx_window>& wnd) noexcept -> mu::leaf::result<mu::gfx_window::renderer_ref>
 {
-	MU_LEAF_AUTO(wants_to_close, wnd->wants_to_close());
+	if (wnd)
+	{
+		MU_LEAF_AUTO(wants_to_close, wnd->wants_to_close());
 
-	if (!wants_to_close)
-	{
-		MU_LEAF_AUTO(renderer, wnd->begin_window());
-		MU_LEAF_CHECK(renderer->test());
+		if (!wants_to_close)
+		{
+			return wnd->begin_window();
+		}
+		else
+		{
+			wnd.reset();
+		}
 	}
-	else
-	{
-		wnd.reset();
-	}
+
+	return mu::gfx_window::renderer_ref{};
+};
+
+auto draw_window(std::shared_ptr<mu::gfx_window>& wnd, mu::gfx_window::renderer_ref renderer) noexcept -> mu::leaf::result<void>
+{
+	MU_LEAF_CHECK(renderer->test());
 
 	return {};
 };
@@ -35,18 +44,19 @@ auto main(int, char**) -> int
 
 			while (primary_window || secondary_window)
 			{
-				MU_LEAF_CHECK(mu::gfx()->pump());
-				if (primary_window)
+				MU_LEAF_AUTO(pumper, mu::gfx()->pump());
+				MU_LEAF_AUTO(primary_renderer, update_window(primary_window));
+				MU_LEAF_AUTO(secondary_renderer, update_window(secondary_window));
+
+				if (primary_renderer)
 				{
-					MU_LEAF_CHECK(update_window(primary_window));
+					MU_LEAF_CHECK(primary_renderer->test());
 				}
 
-				if (secondary_window)
+				if (secondary_renderer)
 				{
-					MU_LEAF_CHECK(update_window(secondary_window));
+					MU_LEAF_CHECK(secondary_renderer->test());
 				}
-
-				MU_LEAF_CHECK(mu::gfx()->present());
 			}
 			return {};
 		}())
