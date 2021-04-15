@@ -12,15 +12,16 @@ namespace mu
 
 	struct diligent_globals
 	{
-		Diligent::RefCntAutoPtr<Diligent::IRenderDevice> m_pDevice;
-		// Diligent::RefCntAutoPtr<Diligent::IDeviceContext>	   m_pImmediateContext;
+		Diligent::RefCntAutoPtr<Diligent::IRenderDevice>	   m_pDevice;
+		Diligent::RefCntAutoPtr<Diligent::IDeviceContext>	   m_pImmediateContext;
 		Diligent::RefCntAutoPtr<Diligent::IEngineFactoryD3D12> m_pFactory;
 
 		diligent_globals()
 		{
-			//Diligent::EngineD3D12CreateInfo EngineCI;
 			m_pFactory = Diligent::GetEngineFactoryD3D12();
-			// m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
+
+			Diligent::EngineD3D12CreateInfo EngineCI;
+			m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
 		}
 
 		~diligent_globals()
@@ -113,10 +114,10 @@ namespace mu
 		diligent_window(Diligent::Win32NativeWindow native_wnd, std::shared_ptr<diligent_globals> globals)
 		{
 			m_globals = globals;
-			
-			Diligent::EngineD3D12CreateInfo EngineCI;
-			m_globals->m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_globals->m_pDevice, &m_pImmediateContext);
-			//m_pImmediateContext = m_globals->m_pImmediateContext;
+
+			// Diligent::EngineD3D12CreateInfo EngineCI;
+			// m_globals->m_pFactory->CreateDeviceAndContextsD3D12(EngineCI, &m_globals->m_pDevice, &m_pImmediateContext);
+			m_pImmediateContext = m_globals->m_pImmediateContext;
 
 			Diligent::SwapChainDesc SCDesc;
 			m_globals->m_pFactory->CreateSwapChainD3D12(m_globals->m_pDevice, m_pImmediateContext, SCDesc, Diligent::FullScreenModeDesc{}, native_wnd, &m_pSwapChain);

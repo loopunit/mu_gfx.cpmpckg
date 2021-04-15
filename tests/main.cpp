@@ -37,25 +37,52 @@ auto main(int, char**) -> int
 			logger->info("Hello world");
 
 			MU_LEAF_CHECK(mu::gfx()->select_platform());
-			MU_LEAF_AUTO(primary_window, mu::gfx()->open_window(100, 100, 1280, 800));
-			MU_LEAF_AUTO(secondary_window, mu::gfx()->open_window(200, 200, 640, 480));
-			MU_LEAF_CHECK(primary_window->show());
-			MU_LEAF_CHECK(secondary_window->show());
 
-			while (primary_window || secondary_window)
+			std::vector<std::shared_ptr<mu::gfx_window>> windows;
+			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(100, 100, 1280, 800));
+			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(200, 200, 640, 480));
+
+			for (auto& wnd : windows)
+			{
+				MU_LEAF_CHECK(wnd->show());
+			}
+
+			while (
+				[&]() noexcept -> bool
+				{
+					for (auto& wnd : windows)
+					{
+						if (wnd)
+						{
+							return true;
+						}
+					}
+					return false;
+				}())
 			{
 				MU_LEAF_AUTO(pumper, mu::gfx()->pump());
-				MU_LEAF_AUTO(primary_renderer, update_window(primary_window));
-				MU_LEAF_AUTO(secondary_renderer, update_window(secondary_window));
 
-				if (primary_renderer)
+				for (auto& wwnd : windows)
 				{
-					MU_LEAF_CHECK(primary_renderer->test());
-				}
+					if (wwnd)
+					{
+						MU_LEAF_AUTO(wants_to_close, wwnd->wants_to_close());
 
-				if (secondary_renderer)
-				{
-					MU_LEAF_CHECK(secondary_renderer->test());
+						if (!wants_to_close) [[likely]]
+						{
+							if (auto wnd = wwnd->begin_window(); wnd) [[likely]]
+							{
+								if (auto& r = *wnd; r) [[likely]]
+								{
+									MU_LEAF_CHECK(r->test());
+								}
+							}
+						}
+						else
+						{
+							wwnd.reset();
+						}
+					}
 				}
 			}
 			return {};

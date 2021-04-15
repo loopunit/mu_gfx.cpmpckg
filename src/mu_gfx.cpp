@@ -194,7 +194,6 @@ namespace mu
 
 					m_diligent_window->create_resources(display_w, display_h);
 					m_diligent_window->clear();
-
 					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
 
 					ImGuiIO& io	   = ImGui::GetIO();

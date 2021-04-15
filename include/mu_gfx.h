@@ -55,6 +55,15 @@ namespace mu
 		}
 	};
 
+	struct gfx_context : public std::enable_shared_from_this<gfx_context>
+	{
+	protected:
+		std::shared_ptr<gfx_context> shared_self() noexcept
+		{
+			return shared_from_this();
+		}
+	};
+
 	struct gfx_pumper
 	{
 		gfx_pumper()		  = default;
