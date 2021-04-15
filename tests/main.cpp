@@ -28,37 +28,6 @@ auto draw_window(std::shared_ptr<mu::gfx_window>& wnd, mu::gfx_window::renderer_
 	return {};
 };
 
-namespace mu
-{
-	template<typename T_CONTAINER, typename T_FUNC, typename T_FUNC_RET>
-	auto for_some_return(T_CONTAINER& container, T_FUNC func, T_FUNC_RET&& true_return_value, T_FUNC_RET&& false_return_value) noexcept -> T_FUNC_RET
-	{
-		for (auto& itor : container)
-		{
-			if (func(itor))
-			{
-				return true_return_value;
-			}
-		}
-
-		return false_return_value;
-	}
-
-	template<typename T_CONTAINER, typename T_FUNC, typename T_FUNC_RET>
-	auto for_some_optional_return(T_CONTAINER& container, T_FUNC func, T_FUNC_RET&& false_return_value) noexcept -> T_FUNC_RET
-	{
-		for (auto& itor : container)
-		{
-			if (auto res = func(itor))
-			{
-				return *res;
-			}
-		}
-
-		return false_return_value;
-	}
-} // namespace mu
-
 auto main(int, char**) -> int
 {
 	if (
