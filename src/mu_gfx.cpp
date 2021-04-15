@@ -455,16 +455,6 @@ namespace mu
 
 			virtual ~gfx_impl() { }
 
-			virtual auto select_platform() noexcept -> leaf::result<bool>
-			try
-			{
-				return true;
-			}
-			catch (...)
-			{
-				return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
-			}
-
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>>
 			try
 			{

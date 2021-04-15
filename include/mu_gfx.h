@@ -81,7 +81,6 @@ namespace mu
 
 			using pumper_ref = std::unique_ptr<gfx_pumper, std::function<void(gfx_pumper*)>>;
 
-			virtual auto select_platform() noexcept -> leaf::result<bool>																 = 0;
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>> = 0;
 			virtual auto pump() noexcept -> mu::leaf::result<pumper_ref>																 = 0;
 			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;

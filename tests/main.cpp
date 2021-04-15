@@ -36,8 +36,6 @@ auto main(int, char**) -> int
 			auto logger = mu::debug::logger()->stdout_logger();
 			logger->info("Hello world");
 
-			MU_LEAF_CHECK(mu::gfx()->select_platform());
-
 			std::vector<std::shared_ptr<mu::gfx_window>> windows;
 			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(100, 100, 1280, 800));
 			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(200, 200, 640, 480));
