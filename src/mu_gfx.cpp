@@ -10,17 +10,7 @@
 #endif
 
 #include "mu_diligent.h"
-
-#include <foonathan/memory/container.hpp>
-#include <foonathan/memory/memory_pool.hpp>
-#include <foonathan/memory/memory_stack.hpp>
-#include <foonathan/memory/smart_ptr.hpp>
-#include <foonathan/memory/static_allocator.hpp>
-#include <foonathan/memory/temporary_allocator.hpp>
-#include <foonathan/memory/namespace_alias.hpp>
-
 #include "imgui_renderer.h"
-
 namespace mu
 {
 	namespace details
@@ -127,104 +117,9 @@ namespace mu
 
 		struct gfx_window_impl : public gfx_window
 		{
-			using frame_stack = memory::memory_stack<>;
-
-			struct gfx_renderer_impl : public gfx_renderer
-			{
-				std::shared_ptr<imgui_context> m_imgui_context;
-				std::shared_ptr<frame_stack>   m_frame_stack;
-				frame_stack::marker			   m_frame_stack_top;
-
-				std::shared_ptr<gfx_window_impl>  m_self_window;
-				std::shared_ptr<diligent_globals> m_renderer_globals;
-				std::shared_ptr<diligent_window>  m_diligent_window;
-
-				gfx_renderer_impl(std::shared_ptr<imgui_context> ic, std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top)
-					: m_imgui_context(ic)
-					, m_frame_stack(fs)
-					, m_frame_stack_top(fs_top)
-				{ }
-
-				static inline void release(gfx_renderer* r) noexcept
-				try
-				{
-					if (auto res = r->end_frame(); !res) [[unlikely]]
-					{
-						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-					}
-
-					auto stack_ref = ((gfx_renderer_impl*)r)->m_frame_stack;
-					auto stack_top = ((gfx_renderer_impl*)r)->m_frame_stack_top;
-					r->~gfx_renderer();
-					stack_ref->unwind(stack_top);
-				}
-				catch (...)
-				{
-					MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-					return;
-				}
-
-				virtual ~gfx_renderer_impl() { }
-
-				virtual auto test() noexcept -> mu::leaf::result<void>
-				{
-					try
-					{
-						ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
-						ImGui::ShowDemoWindow();
-						return {};
-					}
-					catch (...)
-					{
-						return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
-					}
-				}
-
-				auto begin() noexcept -> mu::leaf::result<void>
-				{
-					int display_w, display_h;
-					try
-					{
-						glfwGetFramebufferSize(m_self_window->m_window, &display_w, &display_h);
-					}
-					catch (...)
-					{
-						return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
-					}
-
-					m_diligent_window->create_resources(display_w, display_h);
-					m_diligent_window->clear();
-					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
-
-					ImGuiIO& io	   = ImGui::GetIO();
-					io.DisplaySize = ImVec2(float(display_w), float(display_h));
-
-					m_imgui_context->m_imgui_renderer->NewFrame(display_w, display_h, Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL);
-					ImGui::NewFrame();
-
-					return {};
-				}
-
-				virtual auto end_frame() noexcept -> mu::leaf::result<void>
-				try
-				{
-					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
-					ImGui::Render();
-					m_imgui_context->m_imgui_renderer->RenderDrawData(m_diligent_window->m_pImmediateContext, ImGui::GetDrawData());
-					ImGui::EndFrame();
-					return {};
-				}
-				catch (...)
-				{
-					return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
-				}
-			};
-
 			std::shared_ptr<glfw_system> m_glfw_system;
 			GLFWwindow*					 m_window = nullptr;
 
-			std::shared_ptr<frame_stack>	  m_frame_stack;
-			frame_stack::marker				  m_frame_stack_top;
 			std::shared_ptr<diligent_window>  m_diligent_window;
 			std::shared_ptr<diligent_globals> m_renderer_globals;
 			std::shared_ptr<imgui_context>	  m_imgui_context;
@@ -270,10 +165,7 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 
-			gfx_window_impl(std::shared_ptr<glfw_system> sys, int posX, int posY, int sizeX, int sizeY)
-				: m_glfw_system(sys)
-				, m_frame_stack(std::make_unique<frame_stack>(4096))
-				, m_frame_stack_top(m_frame_stack->top())
+			gfx_window_impl(std::shared_ptr<glfw_system> sys, int posX, int posY, int sizeX, int sizeY) : m_glfw_system(sys)
 			{
 				MU_LEAF_AUTO_THROW(new_window, create_window(posX, posY, sizeX, sizeY));
 				glfwSetWindowUserPointer(new_window, this);
@@ -325,48 +217,51 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 
-			virtual auto begin_window() noexcept -> mu::leaf::result<renderer_ref>
+			virtual auto begin_frame() noexcept -> mu::leaf::result<void>
 			{
-				if (m_frame_stack->top() == m_frame_stack_top) [[likely]]
+				if (!m_renderer_globals) [[unlikely]]
 				{
-					if (!m_renderer_globals) [[unlikely]]
+					m_renderer_globals = m_glfw_system->get_renderer_globals();
+				}
+
+				if (m_renderer_globals) [[likely]]
+				{
+					if (!m_diligent_window) [[unlikely]]
 					{
-						m_renderer_globals = m_glfw_system->get_renderer_globals();
-					}
-
-					if (m_renderer_globals) [[likely]]
-					{
-						if (!m_diligent_window) [[unlikely]]
+						try
 						{
-							try
-							{
-								m_diligent_window = std::make_shared<diligent_window>(Diligent::Win32NativeWindow{glfwGetWin32Window(m_window)}, m_renderer_globals);
-								m_imgui_context	  = std::make_shared<imgui_context>(m_diligent_window);
-							}
-							catch (...)
-							{
-								return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
-							}
+							m_diligent_window = std::make_shared<diligent_window>(Diligent::Win32NativeWindow{glfwGetWin32Window(m_window)}, m_renderer_globals);
+							m_imgui_context	  = std::make_shared<imgui_context>(m_diligent_window);
 						}
-
-						if (m_diligent_window) [[likely]]
-						{
-							auto stack_root = m_frame_stack->top();
-							auto impl_mem	= m_frame_stack->allocate(sizeof(gfx_renderer_impl), 64);
-							auto impl_ptr	= new (impl_mem) gfx_renderer_impl(m_imgui_context, m_frame_stack, m_frame_stack_top);
-
-							impl_ptr->m_self_window		 = static_pointer_cast<gfx_window_impl>(shared_self());
-							impl_ptr->m_renderer_globals = m_renderer_globals;
-							impl_ptr->m_diligent_window	 = m_diligent_window;
-
-							MU_LEAF_CHECK(impl_ptr->begin());
-
-							return renderer_ref(impl_ptr, gfx_renderer_impl::release);
-						}
-						else
+						catch (...)
 						{
 							return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 						}
+					}
+
+					if (m_diligent_window) [[likely]]
+					{
+						int display_w, display_h;
+						try
+						{
+							glfwGetFramebufferSize(m_window, &display_w, &display_h);
+						}
+						catch (...)
+						{
+							return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+						}
+
+						m_diligent_window->create_resources(display_w, display_h);
+						m_diligent_window->clear();
+						ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+
+						ImGuiIO& io	   = ImGui::GetIO();
+						io.DisplaySize = ImVec2(float(display_w), float(display_h));
+
+						m_imgui_context->m_imgui_renderer->NewFrame(display_w, display_h, Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL);
+						ImGui::NewFrame();
+
+						return {};
 					}
 					else
 					{
@@ -375,7 +270,6 @@ namespace mu
 				}
 				else
 				{
-					// There was a renderer already in flight
 					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 				}
 			}
@@ -384,6 +278,34 @@ namespace mu
 			{
 				MU_LEAF_CHECK(m_diligent_window->present());
 				return {};
+			}
+
+			virtual auto test() noexcept -> mu::leaf::result<void>
+			{
+				try
+				{
+					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+					ImGui::ShowDemoWindow();
+					return {};
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+				}
+			}
+
+			virtual auto end_frame() noexcept -> mu::leaf::result<void>
+			try
+			{
+				ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
+				ImGui::Render();
+				m_imgui_context->m_imgui_renderer->RenderDrawData(m_diligent_window->m_pImmediateContext, ImGui::GetDrawData());
+				ImGui::EndFrame();
+				return {};
+			}
+			catch (...)
+			{
+				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 		};
 	} // namespace details
@@ -395,53 +317,8 @@ namespace mu
 	{
 		struct gfx_impl : public gfx_interface
 		{
-			using frame_stack = memory::memory_stack<>;
-
-			struct pumper_impl : public gfx_pumper
-			{
-				std::shared_ptr<frame_stack> m_frame_stack;
-				frame_stack::marker			 m_frame_stack_top;
-
-				pumper_impl(std::shared_ptr<frame_stack> fs, frame_stack::marker fs_top) : m_frame_stack(fs), m_frame_stack_top(fs_top) { }
-
-				static inline void release(gfx_pumper* r) noexcept
-				try
-				{
-					if (auto res = r->present(); !res) [[unlikely]]
-					{
-						MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-					}
-
-					auto stack_ref = ((pumper_impl*)r)->m_frame_stack;
-					auto stack_top = ((pumper_impl*)r)->m_frame_stack_top;
-					r->~gfx_pumper();
-					stack_ref->unwind(stack_top);
-				}
-				catch (...)
-				{
-					MU_LEAF_LOG_ERROR(gfx_error::not_specified{});
-					return;
-				}
-
-				virtual ~pumper_impl() { }
-
-				virtual auto present() noexcept -> mu::leaf::result<void>
-				try
-				{
-					return gfx()->present();
-				}
-				catch (...)
-				{
-					return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
-				}
-			};
-
-			std::shared_ptr<frame_stack>				m_frame_stack;
-			frame_stack::marker							m_frame_stack_top;
-			std::weak_ptr<glfw_system>					m_glfw_system;
-			std::vector<std::weak_ptr<gfx_window_impl>> m_windows;
-
-			auto get_system_ref() noexcept -> std::shared_ptr<glfw_system>
+			std::weak_ptr<glfw_system> m_glfw_system;
+			auto					   get_system_ref() noexcept -> std::shared_ptr<glfw_system>
 			{
 				auto system_ref = (m_glfw_system.expired()) ? std::make_shared<glfw_system>() : m_glfw_system.lock();
 				if (m_glfw_system.expired()) [[unlikely]]
@@ -451,9 +328,11 @@ namespace mu
 				return system_ref;
 			}
 
-			gfx_impl() : m_frame_stack(std::make_unique<frame_stack>(4096)), m_frame_stack_top(m_frame_stack->top()) { }
+			gfx_impl() = default;
 
-			virtual ~gfx_impl() { }
+			virtual ~gfx_impl() = default;
+
+			std::vector<std::weak_ptr<gfx_window_impl>> m_windows;
 
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>>
 			try
@@ -468,23 +347,13 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 			}
 
-			virtual auto pump() noexcept -> mu::leaf::result<pumper_ref>
+			virtual auto pump() noexcept -> mu::leaf::result<void>
 			try
 			{
 				if (!m_glfw_system.expired()) [[likely]]
 				{
-					if (m_frame_stack->top() == m_frame_stack_top) [[likely]]
-					{
-						auto stack_root = m_frame_stack->top();
-						auto impl_mem	= m_frame_stack->allocate(sizeof(pumper_impl), 64);
-						auto impl_ptr	= new (impl_mem) pumper_impl(m_frame_stack, m_frame_stack_top);
-						glfwPollEvents();
-						return pumper_ref(impl_ptr, pumper_impl::release);
-					}
-					else
-					{
-						return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
-					}
+					glfwPollEvents();
+					return {};
 				}
 				else
 				{

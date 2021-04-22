@@ -28,48 +28,16 @@ namespace mu
 
 namespace mu
 {
-	struct gfx_renderer
+	struct gfx_window
 	{
-		gfx_renderer()			= default;
-		virtual ~gfx_renderer() = default;
-
-		virtual auto test() noexcept -> mu::leaf::result<void>		= 0;
-		virtual auto end_frame() noexcept -> mu::leaf::result<void> = 0;
-	};
-
-	struct gfx_window : public std::enable_shared_from_this<gfx_window>
-	{
-		using renderer_ref = std::unique_ptr<gfx_renderer, std::function<void(gfx_renderer*)>>;
-
 		gfx_window()		  = default;
 		virtual ~gfx_window() = default;
 
-		virtual auto wants_to_close() noexcept -> mu::leaf::result<bool>	   = 0;
-		virtual auto show() noexcept -> mu::leaf::result<void>				   = 0;
-		virtual auto begin_window() noexcept -> mu::leaf::result<renderer_ref> = 0;
-
-	protected:
-		std::shared_ptr<gfx_window> shared_self() noexcept
-		{
-			return shared_from_this();
-		}
-	};
-
-	struct gfx_context : public std::enable_shared_from_this<gfx_context>
-	{
-	protected:
-		std::shared_ptr<gfx_context> shared_self() noexcept
-		{
-			return shared_from_this();
-		}
-	};
-
-	struct gfx_pumper
-	{
-		gfx_pumper()		  = default;
-		virtual ~gfx_pumper() = default;
-
-		virtual auto present() noexcept -> mu::leaf::result<void> = 0;
+		virtual auto wants_to_close() noexcept -> mu::leaf::result<bool> = 0;
+		virtual auto show() noexcept -> mu::leaf::result<void>			 = 0;
+		virtual auto begin_frame() noexcept -> mu::leaf::result<void>	 = 0;
+		virtual auto test() noexcept -> mu::leaf::result<void>			 = 0;
+		virtual auto end_frame() noexcept -> mu::leaf::result<void>		 = 0;
 	};
 
 	namespace details
@@ -79,10 +47,8 @@ namespace mu
 			gfx_interface()			 = default;
 			virtual ~gfx_interface() = default;
 
-			using pumper_ref = std::unique_ptr<gfx_pumper, std::function<void(gfx_pumper*)>>;
-
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>> = 0;
-			virtual auto pump() noexcept -> mu::leaf::result<pumper_ref>																 = 0;
+			virtual auto pump() noexcept -> mu::leaf::result<void>																		 = 0;
 			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;
 		};
 	} // namespace details

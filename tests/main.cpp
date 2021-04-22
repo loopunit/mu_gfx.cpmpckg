@@ -2,6 +2,7 @@
 
 static auto all_error_handlers = std::tuple_cat(mu::error_handlers, mu::only_gfx_error_handlers);
 
+#if 0
 auto update_window(std::shared_ptr<mu::gfx_window>& wnd) noexcept -> mu::leaf::result<mu::gfx_window::renderer_ref>
 {
 	if (wnd)
@@ -27,6 +28,7 @@ auto draw_window(std::shared_ptr<mu::gfx_window>& wnd, mu::gfx_window::renderer_
 
 	return {};
 };
+#endif
 
 auto main(int, char**) -> int
 {
@@ -45,16 +47,14 @@ auto main(int, char**) -> int
 				MU_LEAF_CHECK(wnd->show());
 			}
 
-			while (mu::for_some_return(
-				windows,
+			while (std::any_of(
+				windows.begin(), windows.end(),
 				[](std::shared_ptr<mu::gfx_window>& wnd) -> bool
 				{
 					return wnd ? true : false;
-				},
-				true,
-				false))
+				}))
 			{
-				MU_LEAF_AUTO(pumper, mu::gfx()->pump());
+				MU_LEAF_CHECK(mu::gfx()->pump());
 
 				for (auto& wwnd : windows)
 				{
@@ -64,12 +64,10 @@ auto main(int, char**) -> int
 
 						if (!wants_to_close) [[likely]]
 						{
-							if (auto wnd = wwnd->begin_window(); wnd) [[likely]]
+							if (wwnd->begin_frame()) [[likely]]
 							{
-								if (auto& r = *wnd; r) [[likely]]
-								{
-									MU_LEAF_CHECK(r->test());
-								}
+								MU_LEAF_CHECK(wwnd->test());
+								MU_LEAF_CHECK(wwnd->end_frame());
 							}
 						}
 						else
@@ -78,6 +76,7 @@ auto main(int, char**) -> int
 						}
 					}
 				}
+				MU_LEAF_CHECK(mu::gfx()->present());
 			}
 			return {};
 		}())
