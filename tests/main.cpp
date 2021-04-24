@@ -20,7 +20,7 @@ auto main(int, char**) -> int
 
 			while (windows.size() > 0)
 			{
-				MU_LEAF_CHECK(mu::gfx_do_frame(
+				MU_LEAF_CHECK(mu::gfx()->do_frame(
 					[&]() noexcept -> mu::leaf::result<void>
 					{
 						for (auto itor = windows.begin(); itor != windows.end();)
@@ -32,12 +32,10 @@ auto main(int, char**) -> int
 
 								if (!wants_to_close) [[likely]]
 								{
-									MU_LEAF_CHECK(mu::gfx_do_window(
-										*wwnd,
+									MU_LEAF_CHECK(wwnd->do_frame(
 										[&wwnd]() -> mu::leaf::result<void>
 										{
-											return mu::gfx_do_imgui(
-												*wwnd,
+											return wwnd->do_imgui(
 												[]() -> mu::leaf::result<void>
 												{
 													try

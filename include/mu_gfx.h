@@ -41,6 +41,38 @@ namespace mu
 		virtual auto begin_imgui() noexcept -> mu::leaf::result<void>	 = 0;
 		virtual auto end_imgui() noexcept -> mu::leaf::result<void>		 = 0;
 		virtual auto end_frame() noexcept -> mu::leaf::result<void>		 = 0;
+	
+		template<typename T_FUNC>
+		auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
+		{
+			MU_LEAF_CHECK(this->begin_frame());
+			auto end_frame = sg::make_scope_guard(
+				[&]() noexcept -> void
+				{
+					if (auto err = this->end_frame(); !err) [[unlikely]]
+					{
+						// TODO: log err.error();
+					}
+				});
+			return func();
+		}
+
+		template<typename T_FUNC>
+		auto do_imgui(T_FUNC func) noexcept -> mu::leaf::result<void>
+		{
+			MU_LEAF_CHECK(this->begin_imgui());
+
+			auto end_imgui = sg::make_scope_guard(
+				[&]() noexcept -> void
+				{
+					if (auto err = this->end_imgui(); !err) [[unlikely]]
+					{
+						// TODO: log err.error();
+					}
+				});
+
+			return func();
+		}
 	};
 
 	namespace details
@@ -52,57 +84,24 @@ namespace mu
 
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>> = 0;
 			virtual auto pump() noexcept -> mu::leaf::result<void>																		 = 0;
-			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;
+			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;		
+
+			template<typename T_FUNC>
+			auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
+			{
+				MU_LEAF_CHECK(this->pump());
+				auto end_frame = sg::make_scope_guard(
+					[&]() noexcept -> void
+					{
+						if (auto err = this->present(); !err) [[unlikely]]
+						{
+							// TODO: log err.error();
+						}
+					});
+				return func();
+			}
 		};
 	} // namespace details
 
 	using gfx = exported_singleton<virtual_singleton<details::gfx_interface>>;
-
-	template<typename T_FUNC>
-	auto gfx_do_imgui(mu::gfx_window& wnd, T_FUNC func) noexcept -> mu::leaf::result<void>
-	{
-		MU_LEAF_CHECK(wnd.begin_imgui());
-
-		auto end_imgui = sg::make_scope_guard(
-			[&wnd]() noexcept -> void
-			{
-				if (auto err = wnd.end_imgui(); !err) [[unlikely]]
-				{
-					// TODO: log err.error();
-				}
-			});
-
-		return func();
-	}
-
-	template<typename T_FUNC>
-	auto gfx_do_window(mu::gfx_window& wnd, T_FUNC func) noexcept -> mu::leaf::result<void>
-	{
-		MU_LEAF_CHECK(wnd.begin_frame());
-		auto end_frame = sg::make_scope_guard(
-			[&wnd]() noexcept -> void
-			{
-				if (auto err = wnd.end_frame(); !err) [[unlikely]]
-				{
-					// TODO: log err.error();
-				}
-			});
-		return func();
-	}
-
-	template<typename T_FUNC>
-	auto gfx_do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
-	{
-		MU_LEAF_CHECK(mu::gfx()->pump());
-		auto end_frame = sg::make_scope_guard(
-			[]() noexcept -> void
-			{
-				if (auto err = mu::gfx()->present(); !err) [[unlikely]]
-				{
-					// TODO: log err.error();
-				}
-			});
-		return func();
-	}
-
 } // namespace mu
