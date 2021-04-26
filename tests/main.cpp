@@ -7,7 +7,7 @@ auto main(int, char**) -> int
 	if (auto app_error = []() -> mu::leaf::result<void>
 		{
 			mu::enable_dpi_awareness();
-			
+
 			auto logger = mu::debug::logger()->stdout_logger();
 			logger->info("Hello world");
 
@@ -42,6 +42,16 @@ auto main(int, char**) -> int
 												{
 													try
 													{
+														{
+															ImGui::Begin("Hello, world!");
+
+															ImGui::Text(
+																"%.3f ms/frame (%.1f FPS)",
+																ImGui::GetIO().DeltaTime * 1000.0f,
+																1.0f / ImGui::GetIO().DeltaTime);
+															
+															ImGui::End();
+														}
 														ImGui::ShowDemoWindow();
 														return {};
 													}
