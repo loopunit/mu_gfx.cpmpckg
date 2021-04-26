@@ -59,23 +59,27 @@ namespace mu
 		{
 			std::shared_ptr<diligent_window>				 m_diligent_window;
 			std::shared_ptr<ImGuiContext>					 m_imgui_context;
-			std::shared_ptr<Diligent::ImGuiDiligentRenderer> m_imgui_renderer;
+			std::shared_ptr<Diligent::imgui_renderer> m_imgui_renderer;
+			float											 m_dpi_scale{1.0f};
 
-			imgui_context(std::shared_ptr<diligent_window> diligent_window) : m_diligent_window(diligent_window), m_imgui_context(ImGui::CreateContext(), ImGui::DestroyContext)
+			imgui_context(GLFWwindow* window, std::shared_ptr<diligent_window> diligent_window)
+				: m_diligent_window(diligent_window)
+				, m_imgui_context(ImGui::CreateContext(), ImGui::DestroyContext)
 			{
-				const auto& swapchain_desc = m_diligent_window->m_pSwapChain->GetDesc();
+				const auto& swapchain_desc = m_diligent_window->m_swap_chain->GetDesc();
 
 				ImGui::SetCurrentContext(m_imgui_context.get());
-
-				m_imgui_renderer = std::make_shared<Diligent::ImGuiDiligentRenderer>(
-					m_diligent_window->m_globals->m_pDevice,
+				m_dpi_scale = get_dpi_scale_for_hwnd(glfwGetWin32Window(window));
+				
+				m_imgui_renderer = std::make_shared<Diligent::imgui_renderer>(
+					m_diligent_window->m_globals->m_device,
 					swapchain_desc.ColorBufferFormat,
 					swapchain_desc.DepthBufferFormat,
 					1024 * 1024,
 					1024 * 1024,
-					diligent_window->get_dpi_scale());
+					m_dpi_scale);
 
-				ImGui::GetStyle().ScaleAllSizes(diligent_window->get_dpi_scale());
+				ImGui::GetStyle().ScaleAllSizes(m_dpi_scale);
 			}
 
 			~imgui_context()
@@ -349,9 +353,22 @@ namespace mu
 					{
 						auto self = reinterpret_cast<gfx_window_impl*>(glfwGetWindowUserPointer(window));
 						self->m_imgui_context->make_current();
+
 						ImGuiIO& io = ImGui::GetIO();
 						io.AddInputCharacter(c);
 					});
+
+				//glfwSetWindowSizeCallback(
+				//	m_window,
+				//	[](GLFWwindow* window, int, int)
+				//	{
+				//		auto self = reinterpret_cast<gfx_window_impl*>(glfwGetWindowUserPointer(window));
+				//		self->m_imgui_context->make_current();
+				//		if (ImGuiViewport* viewport = ImGui::FindViewportByPlatformHandle((void*)self->m_window))
+				//		{
+				//			viewport->PlatformRequestResize = true;
+				//		}
+				//	});
 
 				ImGui_ImplGlfw_UpdateMonitors();
 
@@ -359,6 +376,16 @@ namespace mu
 					[](GLFWmonitor* mon, int)
 					{
 						auto self				   = reinterpret_cast<gfx_window_impl*>(glfwGetMonitorUserPointer(mon));
+						self->g_WantUpdateMonitors = true;
+					});
+
+				glfwSetWindowContentScaleCallback(
+					m_window,
+					[](GLFWwindow* window, float, float)
+					{
+						auto self = reinterpret_cast<gfx_window_impl*>(glfwGetWindowUserPointer(window));
+						self->m_imgui_context->make_current();
+
 						self->g_WantUpdateMonitors = true;
 					});
 
@@ -562,17 +589,14 @@ namespace mu
 
 					int w, h;
 					glfwGetMonitorWorkarea(glfw_monitors[n], &x, &y, &w, &h);
-					if (w > 0 && h > 0) // Workaround a small GLFW issue reporting zero on monitor changes: https://github.com/glfw/glfw/pull/1761
-					{
-						monitor.WorkPos	 = ImVec2((float)x, (float)y);
-						monitor.WorkSize = ImVec2((float)w, (float)h);
-					}
+					monitor.WorkPos	 = ImVec2((float)x, (float)y);
+					monitor.WorkSize = ImVec2((float)w, (float)h);
 
 					// Warning: the validity of monitor DPI information on Windows depends on the application DPI awareness settings, which generally needs to be set in the
 					// manifest or at runtime.
 					float x_scale, y_scale;
 					glfwGetMonitorContentScale(glfw_monitors[n], &x_scale, &y_scale);
-					monitor.DpiScale = x_scale * 2.0f;
+					monitor.DpiScale = y_scale;
 
 					platform_io.Monitors.push_back(monitor);
 				}
@@ -628,23 +652,20 @@ namespace mu
 					try
 					{
 						// TODO: do a better job figuring out scale, default monitor isn't necessarily right
-						float xscale, yscale;
 						auto mon = glfwGetWindowMonitor(m_window);
 						if (!mon)
 						{
 							mon = glfwGetPrimaryMonitor();
 						}
-						glfwGetMonitorContentScale(mon, &xscale, &yscale);
-						m_diligent_window = std::make_shared<diligent_window>(Diligent::Win32NativeWindow{glfwGetWin32Window(m_window)}, m_renderer_globals, yscale);
-
-						m_imgui_context = std::make_shared<imgui_context>(m_diligent_window);
-
-						MU_LEAF_CHECK(init_imgui_resources());
+						m_diligent_window = std::make_shared<diligent_window>(Diligent::Win32NativeWindow{glfwGetWin32Window(m_window)}, m_renderer_globals);
+						m_imgui_context	  = std::make_shared<imgui_context>(m_window, m_diligent_window);
 					}
 					catch (...)
 					{
 						return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 					}
+
+					MU_LEAF_CHECK(init_imgui_resources());
 				}
 
 				return {};
@@ -687,12 +708,13 @@ namespace mu
 				{
 					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
 
-					// ImGuiIO& io	   = ImGui::GetIO();
-					// io.DisplaySize = ImVec2(float(m_display_size[0]), float(m_display_size[1]));
-
 					ImGui_ImplGlfw_NewFrame();
+
+					auto m_dpi_scale = get_dpi_scale_for_hwnd(glfwGetWin32Window(m_window));
+
 					m_imgui_context->m_imgui_renderer
-						->NewFrame(m_display_size[0], m_display_size[1], Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL, m_diligent_window->get_dpi_scale());
+						->new_frame(m_display_size[0], m_display_size[1], Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL, m_dpi_scale);
+
 					ImGui::NewFrame();
 
 					return {};
@@ -709,7 +731,7 @@ namespace mu
 				{
 					ImGui::SetCurrentContext(m_imgui_context->m_imgui_context.get());
 					ImGui::Render();
-					m_imgui_context->m_imgui_renderer->RenderDrawData(m_diligent_window->m_pImmediateContext, ImGui::GetDrawData());
+					m_imgui_context->m_imgui_renderer->render_draw_data(m_diligent_window->m_immediate_context, ImGui::GetDrawData());
 					ImGui::EndFrame();
 					return {};
 				}

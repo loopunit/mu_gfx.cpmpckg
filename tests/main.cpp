@@ -6,6 +6,8 @@ auto main(int, char**) -> int
 {
 	if (auto app_error = []() -> mu::leaf::result<void>
 		{
+			mu::enable_dpi_awareness();
+			
 			auto logger = mu::debug::logger()->stdout_logger();
 			logger->info("Hello world");
 

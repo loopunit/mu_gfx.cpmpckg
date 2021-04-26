@@ -41,7 +41,7 @@ namespace mu
 		virtual auto begin_imgui() noexcept -> mu::leaf::result<void>	 = 0;
 		virtual auto end_imgui() noexcept -> mu::leaf::result<void>		 = 0;
 		virtual auto end_frame() noexcept -> mu::leaf::result<void>		 = 0;
-	
+
 		template<typename T_FUNC>
 		auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
 		{
@@ -84,7 +84,7 @@ namespace mu
 
 			virtual auto open_window(int posX, int posY, int sizeX, int sizeY) noexcept -> mu::leaf::result<std::shared_ptr<gfx_window>> = 0;
 			virtual auto pump() noexcept -> mu::leaf::result<void>																		 = 0;
-			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;		
+			virtual auto present() noexcept -> mu::leaf::result<void>																	 = 0;
 
 			template<typename T_FUNC>
 			auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>

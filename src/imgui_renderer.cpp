@@ -34,7 +34,7 @@
 
 namespace Diligent
 {
-	static const char* VertexShaderHLSL = R"(
+	static const char* g_vertex_shader_hlsl = R"(
 cbuffer Constants
 {
     float4x4 ProjectionMatrix;
@@ -62,7 +62,7 @@ void main(in VSInput VSIn, out PSInput PSIn)
 }
 )";
 
-	static const char* PixelShaderHLSL = R"(
+	static const char* g_pixel_shader_hlsl = R"(
 struct PSInput
 {
     float4 pos : SV_POSITION;
@@ -79,7 +79,7 @@ float4 main(in PSInput PSIn) : SV_Target
 }
 )";
 
-	static const char* VertexShaderGLSL = R"(
+	static const char* g_vertex_shader_glsl = R"(
 #ifdef VULKAN
 #   define BINDING(X) layout(binding=X)
 #   define OUT_LOCATION(X) layout(location=X) // Requires separable programs
@@ -114,7 +114,7 @@ void main()
 }
 )";
 
-	static const char* PixelShaderGLSL = R"(
+	static const char* g_pixel_shader_glsl = R"(
 #ifdef VULKAN
 #   define BINDING(X) layout(binding=X)
 #   define IN_LOCATION(X) layout(location=X) // Requires separable programs
@@ -135,79 +135,47 @@ void main()
 }
 )";
 
-	// clang-format off
+	// glslangValidator.exe -V -e main --vn VertexShader_SPIRV ImGUI.vert
 
-// glslangValidator.exe -V -e main --vn VertexShader_SPIRV ImGUI.vert
+	static constexpr uint32_t g_vertex_shader_spirv[] = {
+		0x07230203, 0x00010000, 0x0008000a, 0x00000028, 0x00000000, 0x00020011, 0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e,
+		0x00000000, 0x00000001, 0x000b000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000a, 0x00000016, 0x00000020, 0x00000022, 0x00000025, 0x00000026, 0x00030003,
+		0x00000002, 0x000001a4, 0x00040005, 0x00000004, 0x6e69616d, 0x00000000, 0x00060005, 0x00000008, 0x505f6c67, 0x65567265, 0x78657472, 0x00000000, 0x00060006, 0x00000008,
+		0x00000000, 0x505f6c67, 0x7469736f, 0x006e6f69, 0x00030005, 0x0000000a, 0x00000000, 0x00050005, 0x0000000e, 0x736e6f43, 0x746e6174, 0x00000073, 0x00080006, 0x0000000e,
+		0x00000000, 0x6a6f7250, 0x69746365, 0x614d6e6f, 0x78697274, 0x00000000, 0x00030005, 0x00000010, 0x00000000, 0x00040005, 0x00000016, 0x705f6e69, 0x0000736f, 0x00050005,
+		0x00000020, 0x756f7376, 0x6f635f74, 0x0000006c, 0x00040005, 0x00000022, 0x635f6e69, 0x00006c6f, 0x00050005, 0x00000025, 0x756f7376, 0x76755f74, 0x00000000, 0x00040005,
+		0x00000026, 0x755f6e69, 0x00000076, 0x00050048, 0x00000008, 0x00000000, 0x0000000b, 0x00000000, 0x00030047, 0x00000008, 0x00000002, 0x00040048, 0x0000000e, 0x00000000,
+		0x00000005, 0x00050048, 0x0000000e, 0x00000000, 0x00000023, 0x00000000, 0x00050048, 0x0000000e, 0x00000000, 0x00000007, 0x00000010, 0x00030047, 0x0000000e, 0x00000002,
+		0x00040047, 0x00000010, 0x00000022, 0x00000000, 0x00040047, 0x00000010, 0x00000021, 0x00000000, 0x00040047, 0x00000016, 0x0000001e, 0x00000000, 0x00040047, 0x00000020,
+		0x0000001e, 0x00000000, 0x00040047, 0x00000022, 0x0000001e, 0x00000002, 0x00040047, 0x00000025, 0x0000001e, 0x00000001, 0x00040047, 0x00000026, 0x0000001e, 0x00000001,
+		0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x0003001e, 0x00000008,
+		0x00000007, 0x00040020, 0x00000009, 0x00000003, 0x00000008, 0x0004003b, 0x00000009, 0x0000000a, 0x00000003, 0x00040015, 0x0000000b, 0x00000020, 0x00000001, 0x0004002b,
+		0x0000000b, 0x0000000c, 0x00000000, 0x00040018, 0x0000000d, 0x00000007, 0x00000004, 0x0003001e, 0x0000000e, 0x0000000d, 0x00040020, 0x0000000f, 0x00000002, 0x0000000e,
+		0x0004003b, 0x0000000f, 0x00000010, 0x00000002, 0x00040020, 0x00000011, 0x00000002, 0x0000000d, 0x00040017, 0x00000014, 0x00000006, 0x00000002, 0x00040020, 0x00000015,
+		0x00000001, 0x00000014, 0x0004003b, 0x00000015, 0x00000016, 0x00000001, 0x0004002b, 0x00000006, 0x00000018, 0x00000000, 0x0004002b, 0x00000006, 0x00000019, 0x3f800000,
+		0x00040020, 0x0000001e, 0x00000003, 0x00000007, 0x0004003b, 0x0000001e, 0x00000020, 0x00000003, 0x00040020, 0x00000021, 0x00000001, 0x00000007, 0x0004003b, 0x00000021,
+		0x00000022, 0x00000001, 0x00040020, 0x00000024, 0x00000003, 0x00000014, 0x0004003b, 0x00000024, 0x00000025, 0x00000003, 0x0004003b, 0x00000015, 0x00000026, 0x00000001,
+		0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x00050041, 0x00000011, 0x00000012, 0x00000010, 0x0000000c, 0x0004003d, 0x0000000d,
+		0x00000013, 0x00000012, 0x0004003d, 0x00000014, 0x00000017, 0x00000016, 0x00050051, 0x00000006, 0x0000001a, 0x00000017, 0x00000000, 0x00050051, 0x00000006, 0x0000001b,
+		0x00000017, 0x00000001, 0x00070050, 0x00000007, 0x0000001c, 0x0000001a, 0x0000001b, 0x00000018, 0x00000019, 0x00050091, 0x00000007, 0x0000001d, 0x00000013, 0x0000001c,
+		0x00050041, 0x0000001e, 0x0000001f, 0x0000000a, 0x0000000c, 0x0003003e, 0x0000001f, 0x0000001d, 0x0004003d, 0x00000007, 0x00000023, 0x00000022, 0x0003003e, 0x00000020,
+		0x00000023, 0x0004003d, 0x00000014, 0x00000027, 0x00000026, 0x0003003e, 0x00000025, 0x00000027, 0x000100fd, 0x00010038};
 
-static constexpr uint32_t VertexShader_SPIRV[] =
-{
-    0x07230203,0x00010000,0x0008000a,0x00000028,0x00000000,0x00020011,0x00000001,0x0006000b,
-	0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
-	0x000b000f,0x00000000,0x00000004,0x6e69616d,0x00000000,0x0000000a,0x00000016,0x00000020,
-	0x00000022,0x00000025,0x00000026,0x00030003,0x00000002,0x000001a4,0x00040005,0x00000004,
-	0x6e69616d,0x00000000,0x00060005,0x00000008,0x505f6c67,0x65567265,0x78657472,0x00000000,
-	0x00060006,0x00000008,0x00000000,0x505f6c67,0x7469736f,0x006e6f69,0x00030005,0x0000000a,
-	0x00000000,0x00050005,0x0000000e,0x736e6f43,0x746e6174,0x00000073,0x00080006,0x0000000e,
-	0x00000000,0x6a6f7250,0x69746365,0x614d6e6f,0x78697274,0x00000000,0x00030005,0x00000010,
-	0x00000000,0x00040005,0x00000016,0x705f6e69,0x0000736f,0x00050005,0x00000020,0x756f7376,
-	0x6f635f74,0x0000006c,0x00040005,0x00000022,0x635f6e69,0x00006c6f,0x00050005,0x00000025,
-	0x756f7376,0x76755f74,0x00000000,0x00040005,0x00000026,0x755f6e69,0x00000076,0x00050048,
-	0x00000008,0x00000000,0x0000000b,0x00000000,0x00030047,0x00000008,0x00000002,0x00040048,
-	0x0000000e,0x00000000,0x00000005,0x00050048,0x0000000e,0x00000000,0x00000023,0x00000000,
-	0x00050048,0x0000000e,0x00000000,0x00000007,0x00000010,0x00030047,0x0000000e,0x00000002,
-	0x00040047,0x00000010,0x00000022,0x00000000,0x00040047,0x00000010,0x00000021,0x00000000,
-	0x00040047,0x00000016,0x0000001e,0x00000000,0x00040047,0x00000020,0x0000001e,0x00000000,
-	0x00040047,0x00000022,0x0000001e,0x00000002,0x00040047,0x00000025,0x0000001e,0x00000001,
-	0x00040047,0x00000026,0x0000001e,0x00000001,0x00020013,0x00000002,0x00030021,0x00000003,
-	0x00000002,0x00030016,0x00000006,0x00000020,0x00040017,0x00000007,0x00000006,0x00000004,
-	0x0003001e,0x00000008,0x00000007,0x00040020,0x00000009,0x00000003,0x00000008,0x0004003b,
-	0x00000009,0x0000000a,0x00000003,0x00040015,0x0000000b,0x00000020,0x00000001,0x0004002b,
-	0x0000000b,0x0000000c,0x00000000,0x00040018,0x0000000d,0x00000007,0x00000004,0x0003001e,
-	0x0000000e,0x0000000d,0x00040020,0x0000000f,0x00000002,0x0000000e,0x0004003b,0x0000000f,
-	0x00000010,0x00000002,0x00040020,0x00000011,0x00000002,0x0000000d,0x00040017,0x00000014,
-	0x00000006,0x00000002,0x00040020,0x00000015,0x00000001,0x00000014,0x0004003b,0x00000015,
-	0x00000016,0x00000001,0x0004002b,0x00000006,0x00000018,0x00000000,0x0004002b,0x00000006,
-	0x00000019,0x3f800000,0x00040020,0x0000001e,0x00000003,0x00000007,0x0004003b,0x0000001e,
-	0x00000020,0x00000003,0x00040020,0x00000021,0x00000001,0x00000007,0x0004003b,0x00000021,
-	0x00000022,0x00000001,0x00040020,0x00000024,0x00000003,0x00000014,0x0004003b,0x00000024,
-	0x00000025,0x00000003,0x0004003b,0x00000015,0x00000026,0x00000001,0x00050036,0x00000002,
-	0x00000004,0x00000000,0x00000003,0x000200f8,0x00000005,0x00050041,0x00000011,0x00000012,
-	0x00000010,0x0000000c,0x0004003d,0x0000000d,0x00000013,0x00000012,0x0004003d,0x00000014,
-	0x00000017,0x00000016,0x00050051,0x00000006,0x0000001a,0x00000017,0x00000000,0x00050051,
-	0x00000006,0x0000001b,0x00000017,0x00000001,0x00070050,0x00000007,0x0000001c,0x0000001a,
-	0x0000001b,0x00000018,0x00000019,0x00050091,0x00000007,0x0000001d,0x00000013,0x0000001c,
-	0x00050041,0x0000001e,0x0000001f,0x0000000a,0x0000000c,0x0003003e,0x0000001f,0x0000001d,
-	0x0004003d,0x00000007,0x00000023,0x00000022,0x0003003e,0x00000020,0x00000023,0x0004003d,
-	0x00000014,0x00000027,0x00000026,0x0003003e,0x00000025,0x00000027,0x000100fd,0x00010038
-};
+	static constexpr uint32_t g_fragment_shader_spirv[] = {
+		0x07230203, 0x00010000, 0x0008000a, 0x00000018, 0x00000000, 0x00020011, 0x00000001, 0x0006000b, 0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e,
+		0x00000000, 0x00000001, 0x0008000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x0000000b, 0x00000014, 0x00030010, 0x00000004, 0x00000007, 0x00030003,
+		0x00000002, 0x000001a4, 0x00040005, 0x00000004, 0x6e69616d, 0x00000000, 0x00050005, 0x00000009, 0x756f7370, 0x6f635f74, 0x0000006c, 0x00050005, 0x0000000b, 0x756f7376,
+		0x6f635f74, 0x0000006c, 0x00040005, 0x00000010, 0x74786554, 0x00657275, 0x00050005, 0x00000014, 0x756f7376, 0x76755f74, 0x00000000, 0x00040047, 0x00000009, 0x0000001e,
+		0x00000000, 0x00040047, 0x0000000b, 0x0000001e, 0x00000000, 0x00040047, 0x00000010, 0x00000022, 0x00000000, 0x00040047, 0x00000010, 0x00000021, 0x00000000, 0x00040047,
+		0x00000014, 0x0000001e, 0x00000001, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006,
+		0x00000004, 0x00040020, 0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003, 0x00040020, 0x0000000a, 0x00000001, 0x00000007, 0x0004003b,
+		0x0000000a, 0x0000000b, 0x00000001, 0x00090019, 0x0000000d, 0x00000006, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x0003001b, 0x0000000e,
+		0x0000000d, 0x00040020, 0x0000000f, 0x00000000, 0x0000000e, 0x0004003b, 0x0000000f, 0x00000010, 0x00000000, 0x00040017, 0x00000012, 0x00000006, 0x00000002, 0x00040020,
+		0x00000013, 0x00000001, 0x00000012, 0x0004003b, 0x00000013, 0x00000014, 0x00000001, 0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005,
+		0x0004003d, 0x00000007, 0x0000000c, 0x0000000b, 0x0004003d, 0x0000000e, 0x00000011, 0x00000010, 0x0004003d, 0x00000012, 0x00000015, 0x00000014, 0x00050057, 0x00000007,
+		0x00000016, 0x00000011, 0x00000015, 0x00050085, 0x00000007, 0x00000017, 0x0000000c, 0x00000016, 0x0003003e, 0x00000009, 0x00000017, 0x000100fd, 0x00010038};
 
-static constexpr uint32_t FragmentShader_SPIRV[] =
-{
-	0x07230203,0x00010000,0x0008000a,0x00000018,0x00000000,0x00020011,0x00000001,0x0006000b,
-	0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
-	0x0008000f,0x00000004,0x00000004,0x6e69616d,0x00000000,0x00000009,0x0000000b,0x00000014,
-	0x00030010,0x00000004,0x00000007,0x00030003,0x00000002,0x000001a4,0x00040005,0x00000004,
-	0x6e69616d,0x00000000,0x00050005,0x00000009,0x756f7370,0x6f635f74,0x0000006c,0x00050005,
-	0x0000000b,0x756f7376,0x6f635f74,0x0000006c,0x00040005,0x00000010,0x74786554,0x00657275,
-	0x00050005,0x00000014,0x756f7376,0x76755f74,0x00000000,0x00040047,0x00000009,0x0000001e,
-	0x00000000,0x00040047,0x0000000b,0x0000001e,0x00000000,0x00040047,0x00000010,0x00000022,
-	0x00000000,0x00040047,0x00000010,0x00000021,0x00000000,0x00040047,0x00000014,0x0000001e,
-	0x00000001,0x00020013,0x00000002,0x00030021,0x00000003,0x00000002,0x00030016,0x00000006,
-	0x00000020,0x00040017,0x00000007,0x00000006,0x00000004,0x00040020,0x00000008,0x00000003,
-	0x00000007,0x0004003b,0x00000008,0x00000009,0x00000003,0x00040020,0x0000000a,0x00000001,
-	0x00000007,0x0004003b,0x0000000a,0x0000000b,0x00000001,0x00090019,0x0000000d,0x00000006,
-	0x00000001,0x00000000,0x00000000,0x00000000,0x00000001,0x00000000,0x0003001b,0x0000000e,
-	0x0000000d,0x00040020,0x0000000f,0x00000000,0x0000000e,0x0004003b,0x0000000f,0x00000010,
-	0x00000000,0x00040017,0x00000012,0x00000006,0x00000002,0x00040020,0x00000013,0x00000001,
-	0x00000012,0x0004003b,0x00000013,0x00000014,0x00000001,0x00050036,0x00000002,0x00000004,
-	0x00000000,0x00000003,0x000200f8,0x00000005,0x0004003d,0x00000007,0x0000000c,0x0000000b,
-	0x0004003d,0x0000000e,0x00000011,0x00000010,0x0004003d,0x00000012,0x00000015,0x00000014,
-	0x00050057,0x00000007,0x00000016,0x00000011,0x00000015,0x00050085,0x00000007,0x00000017,
-	0x0000000c,0x00000016,0x0003003e,0x00000009,0x00000017,0x000100fd,0x00010038
-};
-	// clang-format on
-
-	static const char* ShadersMSL = R"(
+	static const char* g_shaders_msl = R"(
 #include <metal_stdlib>
 #include <simd/simd.h>
 
@@ -256,198 +224,213 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 }
 )";
 
-	ImGuiDiligentRenderer::ImGuiDiligentRenderer(
-		IRenderDevice* pDevice,
-		TEXTURE_FORMAT BackBufferFmt,
-		TEXTURE_FORMAT DepthBufferFmt,
-		Uint32		   InitialVertexBufferSize,
-		Uint32		   InitialIndexBufferSize,
+	imgui_renderer::imgui_renderer(
+		IRenderDevice* device,
+		TEXTURE_FORMAT back_buffer_fmt,
+		TEXTURE_FORMAT depth_buffer_fmt,
+		Uint32		   initial_vertex_buffer_size,
+		Uint32		   initial_index_buffer_size,
 		float		   scale)
-		: // clang-format off
-    m_pDevice         {pDevice},
-    m_BackBufferFmt   {BackBufferFmt},
-    m_DepthBufferFmt  {DepthBufferFmt},
-    m_VertexBufferSize{InitialVertexBufferSize},
-    m_IndexBufferSize {InitialIndexBufferSize}
-	// clang-format on
+		: m_device{device}
+		, m_back_buffer_fmt{back_buffer_fmt}
+		, m_depth_buffer_fmt{depth_buffer_fmt}
+		, m_vertex_buffer_size{initial_vertex_buffer_size}
+		, m_index_buffer_size{initial_index_buffer_size}
+		, m_scale{scale}
 	{
-		// Setup back-end capabilities flags
 		IMGUI_CHECKVERSION();
 		ImGuiIO& io			   = ImGui::GetIO();
-		io.BackendRendererName = "ImGuiDiligentRenderer";
+		io.BackendRendererName = "imgui_renderer";
 		io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset; // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
 
-		CreateDeviceObjects(scale);
+		create_device_objects(scale, true);
 	}
 
-	ImGuiDiligentRenderer::~ImGuiDiligentRenderer() { }
+	imgui_renderer::~imgui_renderer() { }
 
-	void ImGuiDiligentRenderer::NewFrame(Uint32 RenderSurfaceWidth, Uint32 RenderSurfaceHeight, SURFACE_TRANSFORM SurfacePreTransform, float scale)
+	void imgui_renderer::new_frame(Uint32 render_surface_width, Uint32 render_surface_height, SURFACE_TRANSFORM surface_pre_transform, float scale)
 	{
-		if (!m_pPSO)
+		create_device_objects(scale, false);
+
+		m_render_surface_width	= render_surface_width;
+		m_render_surface_height = render_surface_height;
+		m_surface_pre_transform = surface_pre_transform;
+	}
+
+	void imgui_renderer::end_frame() { }
+
+	void imgui_renderer::invalidate_device_objects()
+	{
+		m_vertex_buffer.Release();
+		m_index_buffer.Release();
+		m_vertex_constant_buffer.Release();
+		m_pso.Release();
+		m_font_srv.Release();
+		m_srb.Release();
+	}
+
+	void imgui_renderer::invalidate_font_objects()
+	{
+		m_font_srv.Release();
+	}
+
+	void imgui_renderer::create_device_objects(float scale, bool force)
+	{
+		bool assets_exist  = m_pso;
+		bool scale_matches = scale == m_scale;
+
+		if (!force && assets_exist && scale_matches) [[likely]]
 		{
-			CreateDeviceObjects(scale);
+			return;
 		}
 
-		m_RenderSurfaceWidth  = RenderSurfaceWidth;
-		m_RenderSurfaceHeight = RenderSurfaceHeight;
-		m_SurfacePreTransform = SurfacePreTransform;
-	}
-
-	void ImGuiDiligentRenderer::EndFrame() { }
-
-	void ImGuiDiligentRenderer::InvalidateDeviceObjects()
-	{
-		m_pVB.Release();
-		m_pIB.Release();
-		m_pVertexConstantBuffer.Release();
-		m_pPSO.Release();
-		m_pFontSRV.Release();
-		m_pSRB.Release();
-	}
-
-	void ImGuiDiligentRenderer::CreateDeviceObjects(float scale)
-	{
-		InvalidateDeviceObjects();
-
-		ShaderCreateInfo ShaderCI;
-		ShaderCI.UseCombinedTextureSamplers = true;
-		ShaderCI.SourceLanguage				= SHADER_SOURCE_LANGUAGE_DEFAULT;
-
-		const auto& deviceCaps = m_pDevice->GetDeviceCaps();
-
-		RefCntAutoPtr<IShader> pVS;
+		if (force || !assets_exist)
 		{
-			ShaderCI.Desc.ShaderType = SHADER_TYPE_VERTEX;
-			ShaderCI.Desc.Name		 = "Imgui VS";
-			switch (deviceCaps.DevType)
+			invalidate_device_objects();
+
+			ShaderCreateInfo shader_ci;
+			shader_ci.UseCombinedTextureSamplers = true;
+			shader_ci.SourceLanguage			 = SHADER_SOURCE_LANGUAGE_DEFAULT;
+
+			const auto& deviceCaps = m_device->GetDeviceCaps();
+
+			RefCntAutoPtr<IShader> vs;
 			{
-			case RENDER_DEVICE_TYPE_VULKAN:
-				ShaderCI.ByteCode	  = VertexShader_SPIRV;
-				ShaderCI.ByteCodeSize = sizeof(VertexShader_SPIRV);
-				break;
+				shader_ci.Desc.ShaderType = SHADER_TYPE_VERTEX;
+				shader_ci.Desc.Name		  = "Imgui VS";
+				switch (deviceCaps.DevType)
+				{
+				case RENDER_DEVICE_TYPE_VULKAN:
+					shader_ci.ByteCode	   = g_vertex_shader_spirv;
+					shader_ci.ByteCodeSize = sizeof(g_vertex_shader_spirv);
+					break;
 
-			case RENDER_DEVICE_TYPE_D3D11:
-			case RENDER_DEVICE_TYPE_D3D12:
-				ShaderCI.Source = VertexShaderHLSL;
-				break;
+				case RENDER_DEVICE_TYPE_D3D11:
+				case RENDER_DEVICE_TYPE_D3D12:
+					shader_ci.Source = g_vertex_shader_hlsl;
+					break;
 
-			case RENDER_DEVICE_TYPE_GL:
-			case RENDER_DEVICE_TYPE_GLES:
-				ShaderCI.Source = VertexShaderGLSL;
-				break;
+				case RENDER_DEVICE_TYPE_GL:
+				case RENDER_DEVICE_TYPE_GLES:
+					shader_ci.Source = g_vertex_shader_glsl;
+					break;
 
-			case RENDER_DEVICE_TYPE_METAL:
-				ShaderCI.Source		= ShadersMSL;
-				ShaderCI.EntryPoint = "vs_main";
-				break;
+				case RENDER_DEVICE_TYPE_METAL:
+					shader_ci.Source	 = g_shaders_msl;
+					shader_ci.EntryPoint = "vs_main";
+					break;
 
-			default:
-				UNEXPECTED("Unknown render device type");
+				default:
+					UNEXPECTED("Unknown render device type");
+				}
+				m_device->CreateShader(shader_ci, &vs);
 			}
-			m_pDevice->CreateShader(ShaderCI, &pVS);
-		}
 
-		RefCntAutoPtr<IShader> pPS;
-		{
-			ShaderCI.Desc.ShaderType = SHADER_TYPE_PIXEL;
-			ShaderCI.Desc.Name		 = "Imgui PS";
-			switch (deviceCaps.DevType)
+			RefCntAutoPtr<IShader> ps;
 			{
-			case RENDER_DEVICE_TYPE_VULKAN:
-				ShaderCI.ByteCode	  = FragmentShader_SPIRV;
-				ShaderCI.ByteCodeSize = sizeof(FragmentShader_SPIRV);
-				break;
+				shader_ci.Desc.ShaderType = SHADER_TYPE_PIXEL;
+				shader_ci.Desc.Name		  = "Imgui PS";
+				switch (deviceCaps.DevType)
+				{
+				case RENDER_DEVICE_TYPE_VULKAN:
+					shader_ci.ByteCode	   = g_fragment_shader_spirv;
+					shader_ci.ByteCodeSize = sizeof(g_fragment_shader_spirv);
+					break;
 
-			case RENDER_DEVICE_TYPE_D3D11:
-			case RENDER_DEVICE_TYPE_D3D12:
-				ShaderCI.Source = PixelShaderHLSL;
-				break;
+				case RENDER_DEVICE_TYPE_D3D11:
+				case RENDER_DEVICE_TYPE_D3D12:
+					shader_ci.Source = g_pixel_shader_hlsl;
+					break;
 
-			case RENDER_DEVICE_TYPE_GL:
-			case RENDER_DEVICE_TYPE_GLES:
-				ShaderCI.Source = PixelShaderGLSL;
-				break;
+				case RENDER_DEVICE_TYPE_GL:
+				case RENDER_DEVICE_TYPE_GLES:
+					shader_ci.Source = g_pixel_shader_glsl;
+					break;
 
-			case RENDER_DEVICE_TYPE_METAL:
-				ShaderCI.Source		= ShadersMSL;
-				ShaderCI.EntryPoint = "ps_main";
-				break;
+				case RENDER_DEVICE_TYPE_METAL:
+					shader_ci.Source	 = g_shaders_msl;
+					shader_ci.EntryPoint = "ps_main";
+					break;
 
-			default:
-				UNEXPECTED("Unknown render device type");
+				default:
+					UNEXPECTED("Unknown render device type");
+				}
+				m_device->CreateShader(shader_ci, &ps);
 			}
-			m_pDevice->CreateShader(ShaderCI, &pPS);
-		}
 
-		GraphicsPipelineStateCreateInfo PSOCreateInfo;
+			GraphicsPipelineStateCreateInfo pso_create_info;
 
-		PSOCreateInfo.PSODesc.Name = "ImGUI PSO";
-		auto& GraphicsPipeline	   = PSOCreateInfo.GraphicsPipeline;
+			pso_create_info.PSODesc.Name = "ImGUI PSO";
+			auto& gfx_pipeline			 = pso_create_info.GraphicsPipeline;
 
-		GraphicsPipeline.NumRenderTargets  = 1;
-		GraphicsPipeline.RTVFormats[0]	   = m_BackBufferFmt;
-		GraphicsPipeline.DSVFormat		   = m_DepthBufferFmt;
-		GraphicsPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			gfx_pipeline.NumRenderTargets  = 1;
+			gfx_pipeline.RTVFormats[0]	   = m_back_buffer_fmt;
+			gfx_pipeline.DSVFormat		   = m_depth_buffer_fmt;
+			gfx_pipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-		PSOCreateInfo.pVS = pVS;
-		PSOCreateInfo.pPS = pPS;
+			pso_create_info.pVS = vs;
+			pso_create_info.pPS = ps;
 
-		GraphicsPipeline.RasterizerDesc.CullMode	  = CULL_MODE_NONE;
-		GraphicsPipeline.RasterizerDesc.ScissorEnable = True;
-		GraphicsPipeline.DepthStencilDesc.DepthEnable = False;
+			gfx_pipeline.RasterizerDesc.CullMode	  = CULL_MODE_NONE;
+			gfx_pipeline.RasterizerDesc.ScissorEnable = True;
+			gfx_pipeline.DepthStencilDesc.DepthEnable = False;
 
-		auto& RT0				  = GraphicsPipeline.BlendDesc.RenderTargets[0];
-		RT0.BlendEnable			  = True;
-		RT0.SrcBlend			  = BLEND_FACTOR_SRC_ALPHA;
-		RT0.DestBlend			  = BLEND_FACTOR_INV_SRC_ALPHA;
-		RT0.BlendOp				  = BLEND_OPERATION_ADD;
-		RT0.SrcBlendAlpha		  = BLEND_FACTOR_INV_SRC_ALPHA;
-		RT0.DestBlendAlpha		  = BLEND_FACTOR_ZERO;
-		RT0.BlendOpAlpha		  = BLEND_OPERATION_ADD;
-		RT0.RenderTargetWriteMask = COLOR_MASK_ALL;
+			auto& rt_0				   = gfx_pipeline.BlendDesc.RenderTargets[0];
+			rt_0.BlendEnable		   = True;
+			rt_0.SrcBlend			   = BLEND_FACTOR_SRC_ALPHA;
+			rt_0.DestBlend			   = BLEND_FACTOR_INV_SRC_ALPHA;
+			rt_0.BlendOp			   = BLEND_OPERATION_ADD;
+			rt_0.SrcBlendAlpha		   = BLEND_FACTOR_INV_SRC_ALPHA;
+			rt_0.DestBlendAlpha		   = BLEND_FACTOR_ZERO;
+			rt_0.BlendOpAlpha		   = BLEND_OPERATION_ADD;
+			rt_0.RenderTargetWriteMask = COLOR_MASK_ALL;
 
-		LayoutElement VSInputs[] //
-			{
-				{0, 0, 2, VT_FLOAT32},	  // pos
-				{1, 0, 2, VT_FLOAT32},	  // uv
-				{2, 0, 4, VT_UINT8, True} // col
+			LayoutElement vs_inputs[] //
+				{
+					{0, 0, 2, VT_FLOAT32},	  // pos
+					{1, 0, 2, VT_FLOAT32},	  // uv
+					{2, 0, 4, VT_UINT8, True} // col
+				};
+			gfx_pipeline.InputLayout.NumElements	= _countof(vs_inputs);
+			gfx_pipeline.InputLayout.LayoutElements = vs_inputs;
+
+			ShaderResourceVariableDesc variables[] = {
+				{SHADER_TYPE_PIXEL, "Texture", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC} //
 			};
-		GraphicsPipeline.InputLayout.NumElements	= _countof(VSInputs);
-		GraphicsPipeline.InputLayout.LayoutElements = VSInputs;
+			pso_create_info.PSODesc.ResourceLayout.Variables	= variables;
+			pso_create_info.PSODesc.ResourceLayout.NumVariables = _countof(variables);
 
-		ShaderResourceVariableDesc Variables[] = {
-			{SHADER_TYPE_PIXEL, "Texture", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC} //
-		};
-		PSOCreateInfo.PSODesc.ResourceLayout.Variables	  = Variables;
-		PSOCreateInfo.PSODesc.ResourceLayout.NumVariables = _countof(Variables);
+			SamplerDesc sampler_linear_wrap;
+			sampler_linear_wrap.AddressU			  = TEXTURE_ADDRESS_WRAP;
+			sampler_linear_wrap.AddressV			  = TEXTURE_ADDRESS_WRAP;
+			sampler_linear_wrap.AddressW			  = TEXTURE_ADDRESS_WRAP;
+			ImmutableSamplerDesc immutable_samplers[] = {
+				{SHADER_TYPE_PIXEL, "Texture", sampler_linear_wrap} //
+			};
+			pso_create_info.PSODesc.ResourceLayout.ImmutableSamplers	= immutable_samplers;
+			pso_create_info.PSODesc.ResourceLayout.NumImmutableSamplers = _countof(immutable_samplers);
 
-		SamplerDesc SamLinearWrap;
-		SamLinearWrap.AddressU				 = TEXTURE_ADDRESS_WRAP;
-		SamLinearWrap.AddressV				 = TEXTURE_ADDRESS_WRAP;
-		SamLinearWrap.AddressW				 = TEXTURE_ADDRESS_WRAP;
-		ImmutableSamplerDesc ImtblSamplers[] = {
-			{SHADER_TYPE_PIXEL, "Texture", SamLinearWrap} //
-		};
-		PSOCreateInfo.PSODesc.ResourceLayout.ImmutableSamplers	  = ImtblSamplers;
-		PSOCreateInfo.PSODesc.ResourceLayout.NumImmutableSamplers = _countof(ImtblSamplers);
+			m_device->CreateGraphicsPipelineState(pso_create_info, &m_pso);
 
-		m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pPSO);
-
-		{
-			BufferDesc BuffDesc;
-			BuffDesc.uiSizeInBytes	= sizeof(float4x4);
-			BuffDesc.Usage			= USAGE_DYNAMIC;
-			BuffDesc.BindFlags		= BIND_UNIFORM_BUFFER;
-			BuffDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
-			m_pDevice->CreateBuffer(BuffDesc, nullptr, &m_pVertexConstantBuffer);
+			{
+				BufferDesc buffer_desc;
+				buffer_desc.uiSizeInBytes  = sizeof(float4x4);
+				buffer_desc.Usage		   = USAGE_DYNAMIC;
+				buffer_desc.BindFlags	   = BIND_UNIFORM_BUFFER;
+				buffer_desc.CPUAccessFlags = CPU_ACCESS_WRITE;
+				m_device->CreateBuffer(buffer_desc, nullptr, &m_vertex_constant_buffer);
+			}
+			m_pso->GetStaticVariableByName(SHADER_TYPE_VERTEX, "Constants")->Set(m_vertex_constant_buffer);
 		}
-		m_pPSO->GetStaticVariableByName(SHADER_TYPE_VERTEX, "Constants")->Set(m_pVertexConstantBuffer);
+		else if (!scale_matches)
+		{
+			invalidate_font_objects();
+		}
 
-		CreateFontsTexture(scale);
+		create_fonts_texture(scale);
 	}
 
-	void ImGuiDiligentRenderer::CreateFontsTexture(float scale)
+	void imgui_renderer::create_fonts_texture(float scale)
 	{
 		// Build texture atlas
 		ImGuiIO& io = ImGui::GetIO();
@@ -460,34 +443,36 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 		int			   width = 0, height = 0;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-		TextureDesc FontTexDesc;
-		FontTexDesc.Name	  = "Imgui font texture";
-		FontTexDesc.Type	  = RESOURCE_DIM_TEX_2D;
-		FontTexDesc.Width	  = static_cast<Uint32>(width);
-		FontTexDesc.Height	  = static_cast<Uint32>(height);
-		FontTexDesc.Format	  = TEX_FORMAT_RGBA8_UNORM;
-		FontTexDesc.BindFlags = BIND_SHADER_RESOURCE;
-		FontTexDesc.Usage	  = USAGE_IMMUTABLE;
+		TextureDesc font_tex_desc;
+		font_tex_desc.Name		= "Imgui font texture";
+		font_tex_desc.Type		= RESOURCE_DIM_TEX_2D;
+		font_tex_desc.Width		= static_cast<Uint32>(width);
+		font_tex_desc.Height	= static_cast<Uint32>(height);
+		font_tex_desc.Format	= TEX_FORMAT_RGBA8_UNORM;
+		font_tex_desc.BindFlags = BIND_SHADER_RESOURCE;
+		font_tex_desc.Usage		= USAGE_IMMUTABLE;
 
-		TextureSubResData Mip0Data[] = {{pixels, FontTexDesc.Width * 4}};
-		TextureData		  InitData(Mip0Data, _countof(Mip0Data));
+		TextureSubResData mip_0_data[] = {{pixels, font_tex_desc.Width * 4}};
+		TextureData		  init_data(mip_0_data, _countof(mip_0_data));
 
-		RefCntAutoPtr<ITexture> pFontTex;
-		m_pDevice->CreateTexture(FontTexDesc, &InitData, &pFontTex);
-		m_pFontSRV = pFontTex->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
+		RefCntAutoPtr<ITexture> font_tex;
+		m_device->CreateTexture(font_tex_desc, &init_data, &font_tex);
+		m_font_srv = font_tex->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
 
-		m_pSRB.Release();
-		m_pPSO->CreateShaderResourceBinding(&m_pSRB, true);
-		m_pTextureVar = m_pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "Texture");
-		VERIFY_EXPR(m_pTextureVar != nullptr);
+		m_srb.Release();
+		m_pso->CreateShaderResourceBinding(&m_srb, true);
+		m_texture_var = m_srb->GetVariableByName(SHADER_TYPE_PIXEL, "Texture");
+		VERIFY_EXPR(m_texture_var != nullptr);
 
 		// Store our identifier
-		io.Fonts->TexID = (ImTextureID)m_pFontSRV;
+		io.Fonts->TexID = (ImTextureID)m_font_srv;
+
+		m_scale = scale;
 	}
 
-	float4 ImGuiDiligentRenderer::TransformClipRect(const ImVec2& DisplaySize, const float4& rect) const
+	float4 imgui_renderer::transform_clip_rect(const ImVec2& display_size, const float4& rect) const
 	{
-		switch (m_SurfacePreTransform)
+		switch (m_surface_pre_transform)
 		{
 		case SURFACE_TRANSFORM_IDENTITY:
 			return rect;
@@ -513,13 +498,12 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 			//
 			float2 a{rect.x, rect.y};
 			float2 c{rect.z, rect.w};
-			return float4 //
-				{
-					DisplaySize.y - c.y, // min_x = c'.x
-					a.x,				 // min_y = a'.y
-					DisplaySize.y - a.y, // max_x = a'.x
-					c.x					 // max_y = c'.y
-				};
+			return float4{
+				display_size.y - c.y, // min_x = c'.x
+				a.x,				  // min_y = a'.y
+				display_size.y - a.y, // max_x = a'.x
+				c.x					  // max_y = c'.y
+			};
 		}
 
 		case SURFACE_TRANSFORM_ROTATE_180:
@@ -541,13 +525,12 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 			//                                     New Origin                                      Old Origin
 			float2 a{rect.x, rect.y};
 			float2 c{rect.z, rect.w};
-			return float4 //
-				{
-					DisplaySize.x - c.x, // min_x = c'.x
-					DisplaySize.y - c.y, // min_y = c'.y
-					DisplaySize.x - a.x, // max_x = a'.x
-					DisplaySize.y - a.y	 // max_y = a'.y
-				};
+			return float4{
+				display_size.x - c.x, // min_x = c'.x
+				display_size.y - c.y, // min_y = c'.y
+				display_size.x - a.x, // max_x = a'.x
+				display_size.y - a.y  // max_y = a'.y
+			};
 		}
 
 		case SURFACE_TRANSFORM_ROTATE_270:
@@ -572,13 +555,12 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 			//                                                            Old origin
 			float2 a{rect.x, rect.y};
 			float2 c{rect.z, rect.w};
-			return float4 //
-				{
-					a.y,				 // min_x = a'.x
-					DisplaySize.x - c.x, // min_y = c'.y
-					c.y,				 // max_x = c'.x
-					DisplaySize.x - a.x	 // max_y = a'.y
-				};
+			return float4{
+				a.y,				  // min_x = a'.x
+				display_size.x - c.x, // min_y = c'.y
+				c.y,				  // max_x = c'.x
+				display_size.x - a.x  // max_y = a'.y
+			};
 		}
 
 		case SURFACE_TRANSFORM_OPTIMAL:
@@ -598,52 +580,58 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 		}
 	}
 
-	void ImGuiDiligentRenderer::RenderDrawData(IDeviceContext* pCtx, ImDrawData* pDrawData)
+	void imgui_renderer::render_draw_data(IDeviceContext* ctx, ImDrawData* draw_data)
 	{
 		// Avoid rendering when minimized
-		if (pDrawData->DisplaySize.x <= 0.0f || pDrawData->DisplaySize.y <= 0.0f)
+		if (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f)
+		{
 			return;
+		}
 
 		// Create and grow vertex/index buffers if needed
-		if (!m_pVB || static_cast<int>(m_VertexBufferSize) < pDrawData->TotalVtxCount)
+		if (!m_vertex_buffer || static_cast<int>(m_vertex_buffer_size) < draw_data->TotalVtxCount)
 		{
-			m_pVB.Release();
-			while (static_cast<int>(m_VertexBufferSize) < pDrawData->TotalVtxCount)
-				m_VertexBufferSize *= 2;
-
-			BufferDesc VBDesc;
-			VBDesc.Name			  = "Imgui vertex buffer";
-			VBDesc.BindFlags	  = BIND_VERTEX_BUFFER;
-			VBDesc.uiSizeInBytes  = m_VertexBufferSize * sizeof(ImDrawVert);
-			VBDesc.Usage		  = USAGE_DYNAMIC;
-			VBDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
-			m_pDevice->CreateBuffer(VBDesc, nullptr, &m_pVB);
-		}
-
-		if (!m_pIB || static_cast<int>(m_IndexBufferSize) < pDrawData->TotalIdxCount)
-		{
-			m_pIB.Release();
-			while (static_cast<int>(m_IndexBufferSize) < pDrawData->TotalIdxCount)
-				m_IndexBufferSize *= 2;
-
-			BufferDesc IBDesc;
-			IBDesc.Name			  = "Imgui index buffer";
-			IBDesc.BindFlags	  = BIND_INDEX_BUFFER;
-			IBDesc.uiSizeInBytes  = m_IndexBufferSize * sizeof(ImDrawIdx);
-			IBDesc.Usage		  = USAGE_DYNAMIC;
-			IBDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
-			m_pDevice->CreateBuffer(IBDesc, nullptr, &m_pIB);
-		}
-
-		{
-			MapHelper<ImDrawVert> Verices(pCtx, m_pVB, MAP_WRITE, MAP_FLAG_DISCARD);
-			MapHelper<ImDrawIdx>  Indices(pCtx, m_pIB, MAP_WRITE, MAP_FLAG_DISCARD);
-
-			ImDrawVert* vtx_dst = Verices;
-			ImDrawIdx*	idx_dst = Indices;
-			for (int n = 0; n < pDrawData->CmdListsCount; n++)
+			m_vertex_buffer.Release();
+			while (static_cast<int>(m_vertex_buffer_size) < draw_data->TotalVtxCount)
 			{
-				const ImDrawList* cmd_list = pDrawData->CmdLists[n];
+				m_vertex_buffer_size *= 2;
+			}
+
+			BufferDesc vb_desc;
+			vb_desc.Name		   = "Imgui vertex buffer";
+			vb_desc.BindFlags	   = BIND_VERTEX_BUFFER;
+			vb_desc.uiSizeInBytes  = m_vertex_buffer_size * sizeof(ImDrawVert);
+			vb_desc.Usage		   = USAGE_DYNAMIC;
+			vb_desc.CPUAccessFlags = CPU_ACCESS_WRITE;
+			m_device->CreateBuffer(vb_desc, nullptr, &m_vertex_buffer);
+		}
+
+		if (!m_index_buffer || static_cast<int>(m_index_buffer_size) < draw_data->TotalIdxCount)
+		{
+			m_index_buffer.Release();
+			while (static_cast<int>(m_index_buffer_size) < draw_data->TotalIdxCount)
+			{
+				m_index_buffer_size *= 2;
+			}
+
+			BufferDesc ib_desc;
+			ib_desc.Name		   = "Imgui index buffer";
+			ib_desc.BindFlags	   = BIND_INDEX_BUFFER;
+			ib_desc.uiSizeInBytes  = m_index_buffer_size * sizeof(ImDrawIdx);
+			ib_desc.Usage		   = USAGE_DYNAMIC;
+			ib_desc.CPUAccessFlags = CPU_ACCESS_WRITE;
+			m_device->CreateBuffer(ib_desc, nullptr, &m_index_buffer);
+		}
+
+		{
+			MapHelper<ImDrawVert> verts(ctx, m_vertex_buffer, MAP_WRITE, MAP_FLAG_DISCARD);
+			MapHelper<ImDrawIdx>  idxs(ctx, m_index_buffer, MAP_WRITE, MAP_FLAG_DISCARD);
+
+			ImDrawVert* vtx_dst = verts;
+			ImDrawIdx*	idx_dst = idxs;
+			for (int n = 0; n < draw_data->CmdListsCount; n++)
+			{
+				const ImDrawList* cmd_list = draw_data->CmdLists[n];
 				memcpy(vtx_dst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
 				memcpy(idx_dst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx));
 				vtx_dst += cmd_list->VtxBuffer.Size;
@@ -657,23 +645,15 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 		{
 			// DisplaySize always refers to the logical dimensions that account for pre-transform, hence
 			// the aspect ratio will be correct after applying appropriate rotation.
-			float L = pDrawData->DisplayPos.x;
-			float R = pDrawData->DisplayPos.x + pDrawData->DisplaySize.x;
-			float T = pDrawData->DisplayPos.y;
-			float B = pDrawData->DisplayPos.y + pDrawData->DisplaySize.y;
+			float L = draw_data->DisplayPos.x;
+			float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
+			float T = draw_data->DisplayPos.y;
+			float B = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
 
-			// clang-format off
-        float4x4 Projection
-        {
-            2.0f / (R - L),                  0.0f,   0.0f,   0.0f,
-            0.0f,                  2.0f / (T - B),   0.0f,   0.0f,
-            0.0f,                            0.0f,   0.5f,   0.0f,
-            (R + L) / (L - R),  (T + B) / (B - T),   0.5f,   1.0f
-        };
-			// clang-format on
+			float4x4 projection{2.0f / (R - L), 0.0f, 0.0f, 0.0f, 0.0f, 2.0f / (T - B), 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f};
 
 			// Bake pre-transform into projection
-			switch (m_SurfacePreTransform)
+			switch (m_surface_pre_transform)
 			{
 			case SURFACE_TRANSFORM_IDENTITY:
 				// Nothing to do
@@ -681,17 +661,17 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 
 			case SURFACE_TRANSFORM_ROTATE_90:
 				// The image content is rotated 90 degrees clockwise.
-				Projection *= float4x4::RotationZ(-PI_F * 0.5f);
+				projection *= float4x4::RotationZ(-PI_F * 0.5f);
 				break;
 
 			case SURFACE_TRANSFORM_ROTATE_180:
 				// The image content is rotated 180 degrees clockwise.
-				Projection *= float4x4::RotationZ(-PI_F * 1.0f);
+				projection *= float4x4::RotationZ(-PI_F * 1.0f);
 				break;
 
 			case SURFACE_TRANSFORM_ROTATE_270:
 				// The image content is rotated 270 degrees clockwise.
-				Projection *= float4x4::RotationZ(-PI_F * 1.5f);
+				projection *= float4x4::RotationZ(-PI_F * 1.5f);
 				break;
 
 			case SURFACE_TRANSFORM_OPTIMAL:
@@ -709,97 +689,99 @@ fragment PSOut ps_main(VSOut in [[stage_in]],
 				UNEXPECTED("Unknown transform");
 			}
 
-			MapHelper<float4x4> CBData(pCtx, m_pVertexConstantBuffer, MAP_WRITE, MAP_FLAG_DISCARD);
-			*CBData = Projection;
+			MapHelper<float4x4> cb_data(ctx, m_vertex_constant_buffer, MAP_WRITE, MAP_FLAG_DISCARD);
+			*cb_data = projection;
 		}
 
-		auto SetupRenderState = [&]() //
+		auto setup_render_state = [&]() -> void
 		{
 			// Setup shader and vertex buffers
-			Uint32	 Offsets[] = {0};
-			IBuffer* pVBs[]	   = {m_pVB};
-			pCtx->SetVertexBuffers(0, 1, pVBs, Offsets, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
-			pCtx->SetIndexBuffer(m_pIB, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-			pCtx->SetPipelineState(m_pPSO);
+			Uint32	 offsets[]		  = {0};
+			IBuffer* vertex_buffers[] = {m_vertex_buffer};
+			ctx->SetVertexBuffers(0, 1, vertex_buffers, offsets, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+			ctx->SetIndexBuffer(m_index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+			ctx->SetPipelineState(m_pso);
 
 			const float blend_factor[4] = {0.f, 0.f, 0.f, 0.f};
-			pCtx->SetBlendFactors(blend_factor);
+			ctx->SetBlendFactors(blend_factor);
 
 			Viewport vp;
-			vp.Width	= static_cast<float>(m_RenderSurfaceWidth) * pDrawData->FramebufferScale.x;
-			vp.Height	= static_cast<float>(m_RenderSurfaceHeight) * pDrawData->FramebufferScale.y;
+			vp.Width	= static_cast<float>(m_render_surface_width) * draw_data->FramebufferScale.x;
+			vp.Height	= static_cast<float>(m_render_surface_height) * draw_data->FramebufferScale.y;
 			vp.MinDepth = 0.0f;
 			vp.MaxDepth = 1.0f;
 			vp.TopLeftX = vp.TopLeftY = 0;
-			pCtx->SetViewports(
+			ctx->SetViewports(
 				1,
 				&vp,
-				static_cast<Uint32>(m_RenderSurfaceWidth * pDrawData->FramebufferScale.x),
-				static_cast<Uint32>(m_RenderSurfaceHeight * pDrawData->FramebufferScale.y));
+				static_cast<Uint32>(m_render_surface_width * draw_data->FramebufferScale.x),
+				static_cast<Uint32>(m_render_surface_height * draw_data->FramebufferScale.y));
 		};
 
-		SetupRenderState();
+		setup_render_state();
 
 		// Render command lists
 		// (Because we merged all buffers into a single one, we maintain our own offset into them)
 		int global_idx_offset = 0;
 		int global_vtx_offset = 0;
 
-		ITextureView* pLastTextureView = nullptr;
-		for (int n = 0; n < pDrawData->CmdListsCount; n++)
+		ITextureView* last_texture_view = nullptr;
+		for (int n = 0; n < draw_data->CmdListsCount; n++)
 		{
-			const ImDrawList* cmd_list = pDrawData->CmdLists[n];
+			const ImDrawList* cmd_list = draw_data->CmdLists[n];
 			for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
 			{
-				const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-				if (pcmd->UserCallback != NULL)
+				const ImDrawCmd* im_cmd = &cmd_list->CmdBuffer[cmd_i];
+				if (im_cmd->UserCallback != NULL)
 				{
 					// User callback, registered via ImDrawList::AddCallback()
 					// (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
-					if (pcmd->UserCallback == ImDrawCallback_ResetRenderState)
-						SetupRenderState();
+					if (im_cmd->UserCallback == ImDrawCallback_ResetRenderState)
+					{
+						setup_render_state();
+					}
 					else
-						pcmd->UserCallback(cmd_list, pcmd);
+					{
+						im_cmd->UserCallback(cmd_list, im_cmd);
+					}
 				}
 				else
 				{
 					// Apply scissor/clipping rectangle
-					float4 ClipRect //
-						{
-							(pcmd->ClipRect.x - pDrawData->DisplayPos.x) * pDrawData->FramebufferScale.x,
-							(pcmd->ClipRect.y - pDrawData->DisplayPos.y) * pDrawData->FramebufferScale.y,
-							(pcmd->ClipRect.z - pDrawData->DisplayPos.x) * pDrawData->FramebufferScale.x,
-							(pcmd->ClipRect.w - pDrawData->DisplayPos.y) * pDrawData->FramebufferScale.y //
-						};
+					float4 clip_rect{
+						(im_cmd->ClipRect.x - draw_data->DisplayPos.x) * draw_data->FramebufferScale.x,
+						(im_cmd->ClipRect.y - draw_data->DisplayPos.y) * draw_data->FramebufferScale.y,
+						(im_cmd->ClipRect.z - draw_data->DisplayPos.x) * draw_data->FramebufferScale.x,
+						(im_cmd->ClipRect.w - draw_data->DisplayPos.y) * draw_data->FramebufferScale.y //
+					};
 					// Apply pretransform
-					ClipRect = TransformClipRect(pDrawData->DisplaySize, ClipRect);
+					clip_rect = transform_clip_rect(draw_data->DisplaySize, clip_rect);
 
-					Rect r //
-						{
-							static_cast<Int32>(ClipRect.x), static_cast<Int32>(ClipRect.y), static_cast<Int32>(ClipRect.z),
-							static_cast<Int32>(ClipRect.w) //
-						};
-					pCtx->SetScissorRects(
+					Rect r{
+						static_cast<Int32>(clip_rect.x), static_cast<Int32>(clip_rect.y), static_cast<Int32>(clip_rect.z),
+						static_cast<Int32>(clip_rect.w) //
+					};
+					ctx->SetScissorRects(
 						1,
 						&r,
-						static_cast<Uint32>(m_RenderSurfaceWidth * pDrawData->FramebufferScale.x),
-						static_cast<Uint32>(m_RenderSurfaceHeight * pDrawData->FramebufferScale.y));
+						static_cast<Uint32>(m_render_surface_width * draw_data->FramebufferScale.x),
+						static_cast<Uint32>(m_render_surface_height * draw_data->FramebufferScale.y));
 
 					// Bind texture
-					auto* pTextureView = reinterpret_cast<ITextureView*>(pcmd->TextureId);
-					VERIFY_EXPR(pTextureView);
-					if (pTextureView != pLastTextureView)
+					auto* texture_view = reinterpret_cast<ITextureView*>(im_cmd->TextureId);
+					VERIFY_EXPR(texture_view);
+					if (texture_view != last_texture_view)
 					{
-						pLastTextureView = pTextureView;
-						m_pTextureVar->Set(pTextureView);
-						pCtx->CommitShaderResources(m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+						last_texture_view = texture_view;
+						m_texture_var->Set(texture_view);
+						ctx->CommitShaderResources(m_srb, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 					}
 
 					// Draw
-					DrawIndexedAttribs DrawAttrs(pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? VT_UINT16 : VT_UINT32, DRAW_FLAG_VERIFY_STATES);
-					DrawAttrs.FirstIndexLocation = pcmd->IdxOffset + global_idx_offset;
-					DrawAttrs.BaseVertex		 = pcmd->VtxOffset + global_vtx_offset;
-					pCtx->DrawIndexed(DrawAttrs);
+					DrawIndexedAttribs draw_attribs(im_cmd->ElemCount, sizeof(ImDrawIdx) == 2 ? VT_UINT16 : VT_UINT32, DRAW_FLAG_VERIFY_STATES);
+					draw_attribs.FirstIndexLocation = im_cmd->IdxOffset + global_idx_offset;
+					draw_attribs.BaseVertex			= im_cmd->VtxOffset + global_vtx_offset;
+					ctx->DrawIndexed(draw_attribs);
 				}
 			}
 			global_idx_offset += cmd_list->IdxBuffer.Size;
