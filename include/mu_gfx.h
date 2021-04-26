@@ -46,7 +46,8 @@ namespace mu
 		auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
 		{
 			MU_LEAF_CHECK(this->begin_frame());
-			auto end_frame = sg::make_scope_guard(
+
+			auto end_frame = gsl::finally(
 				[&]() noexcept -> void
 				{
 					if (auto err = this->end_frame(); !err) [[unlikely]]
@@ -62,7 +63,7 @@ namespace mu
 		{
 			MU_LEAF_CHECK(this->begin_imgui());
 
-			auto end_imgui = sg::make_scope_guard(
+			auto end_imgui = gsl::finally(
 				[&]() noexcept -> void
 				{
 					if (auto err = this->end_imgui(); !err) [[unlikely]]
@@ -90,7 +91,7 @@ namespace mu
 			auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
 			{
 				MU_LEAF_CHECK(this->pump());
-				auto end_frame = sg::make_scope_guard(
+				auto end_frame = gsl::finally(
 					[&]() noexcept -> void
 					{
 						if (auto err = this->present(); !err) [[unlikely]]
