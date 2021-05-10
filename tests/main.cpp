@@ -13,7 +13,7 @@ auto main(int, char**) -> int
 
 			std::vector<std::shared_ptr<mu::gfx_window>> windows;
 			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(100, 100, 1280, 800));
-			//MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(200, 200, 640, 480));
+			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(200, 200, 640, 480));
 
 			for (auto& wnd : windows)
 			{
