@@ -321,7 +321,6 @@ namespace mu
 			{
 				if (m_ready)
 				{
-					MU_LEAF_CHECK(m_diligent_window->clear());
 					try
 					{
 						glfwGetFramebufferSize(m_window.get(), &m_display_size[0], &m_display_size[1]);
@@ -330,6 +329,7 @@ namespace mu
 					{
 						return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 					}
+					MU_LEAF_CHECK(m_diligent_window->clear());
 					MU_LEAF_CHECK(m_imgui_renderer->render_draw_data(Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL, m_display_size[0], m_display_size[1], ctx, draw_data));
 				}
 				return {};
@@ -851,7 +851,6 @@ namespace mu
 
 			[[nodiscard]] auto render(ImDrawData* draw_data) noexcept -> mu::leaf::result<void>
 			{
-				MU_LEAF_CHECK(m_diligent_window->clear());
 				try
 				{
 					glfwGetFramebufferSize(m_window.get(), &m_display_size[0], &m_display_size[1]);
@@ -861,6 +860,7 @@ namespace mu
 					return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 				}
 
+				MU_LEAF_CHECK(m_diligent_window->clear());
 				MU_LEAF_CHECK(m_imgui_renderer->render_draw_data(Diligent::SURFACE_TRANSFORM::SURFACE_TRANSFORM_OPTIMAL, m_display_size[0], m_display_size[1], m_renderer_globals->m_immediate_context, draw_data));
 				return {};
 			}
