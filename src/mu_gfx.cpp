@@ -178,7 +178,7 @@ namespace mu
 					});
 
 				m_window = std::move(wnd);
-				update_dpi();
+				MU_LEAF_RETHROW(update_dpi());
 			}
 
 			virtual ~gfx_child_window()
@@ -392,7 +392,7 @@ namespace mu
 				glfwSetWindowUserPointer(new_window, this);
 
 				m_window = std::move(wnd);
-				update_dpi();
+				MU_LEAF_RETHROW(update_dpi());
 			}
 
 			virtual ~gfx_window_impl()
