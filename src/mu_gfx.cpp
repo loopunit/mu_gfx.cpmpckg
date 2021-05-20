@@ -248,8 +248,8 @@ namespace mu
 				glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 				glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
 				glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-				glfwWindowHint(GLFW_DECORATED, (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? false : true);
-				glfwWindowHint(GLFW_FLOATING, (viewport->Flags & ImGuiViewportFlags_TopMost) ? true : false);
+				glfwWindowHint(GLFW_DECORATED, (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? GLFW_FALSE : GLFW_TRUE);
+				glfwWindowHint(GLFW_FLOATING, (viewport->Flags & ImGuiViewportFlags_TopMost) ? GLFW_TRUE : GLFW_FALSE);
 
 				if (auto wnd = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL); wnd != nullptr) [[likely]]
 				{
@@ -469,6 +469,11 @@ namespace mu
 			{
 				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 				glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+				glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+				glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
+				glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
+				glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+				glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
 
 				if (auto wnd = glfwCreateWindow(sizeX, sizeY, "", NULL, NULL); wnd != nullptr) [[likely]]
 				{

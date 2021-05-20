@@ -13,18 +13,29 @@ auto main(int, char**) -> int
 
 			std::vector<std::shared_ptr<mu::gfx_window>> windows;
 			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(100, 100, 1280, 800));
-			MU_LEAF_EMPLACE_BACK(windows, mu::gfx()->open_window(200, 200, 640, 480));
 
 			for (auto& wnd : windows)
 			{
 				MU_LEAF_CHECK(wnd->show());
 			}
 
+			bool create_new_window = false;
+			
 			while (windows.size() > 0)
 			{
 				MU_LEAF_CHECK(mu::gfx()->do_frame(
 					[&]() noexcept -> mu::leaf::result<void>
 					{
+						if (create_new_window)
+						{
+							create_new_window = false;
+							if (auto new_wnd_res = mu::gfx()->open_window(200, 200, 640, 480))
+							{
+								(*new_wnd_res)->show();
+								windows.emplace_back(std::move(*new_wnd_res));
+							}
+						}
+
 						for (auto itor = windows.begin(); itor != windows.end();)
 						{
 							auto& wwnd = *itor;
@@ -35,10 +46,10 @@ auto main(int, char**) -> int
 								if (!wants_to_close) [[likely]]
 								{
 									MU_LEAF_CHECK(wwnd->do_frame(
-										[&wwnd]() -> mu::leaf::result<void>
+										[&]() -> mu::leaf::result<void>
 										{
 											return wwnd->do_imgui(
-												[]() -> mu::leaf::result<void>
+												[&]() -> mu::leaf::result<void>
 												{
 													try
 													{
@@ -148,6 +159,8 @@ auto main(int, char**) -> int
 
 															ImGui::Text("%.3f ms/frame (%.1f FPS)", ImGui::GetIO().DeltaTime * 1000.0f, 1.0f / ImGui::GetIO().DeltaTime);
 
+															create_new_window |= ImGui::Button("Create New Window");
+															
 															ImGui::End();
 														}
 														ImGui::ShowDemoWindow();
