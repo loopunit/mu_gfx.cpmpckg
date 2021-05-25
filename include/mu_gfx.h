@@ -48,44 +48,6 @@ namespace mu
 		virtual [[nodiscard]] auto end_imgui() noexcept -> mu::leaf::result<void>	   = 0;
 		virtual [[nodiscard]] auto end_frame() noexcept -> mu::leaf::result<void>	   = 0;
 		virtual [[nodiscard]] auto make_current() noexcept -> mu::leaf::result<void>   = 0;
-
-		virtual [[nodiscard]] auto begin_frame(tf::Subflow& subflow) noexcept -> mu::leaf::result<void> = 0;
-		virtual [[nodiscard]] auto begin_imgui(tf::Subflow& subflow) noexcept -> mu::leaf::result<void> = 0;
-		virtual [[nodiscard]] auto end_imgui(tf::Subflow& subflow) noexcept -> mu::leaf::result<void>	= 0;
-		virtual [[nodiscard]] auto end_frame(tf::Subflow& subflow) noexcept -> mu::leaf::result<void>	= 0;
-
-		template<typename T_FUNC>
-		[[nodiscard]] auto do_frame(T_FUNC func) noexcept -> mu::leaf::result<void>
-		{
-			MU_LEAF_CHECK(this->begin_frame());
-
-			auto end_frame = gsl::finally(
-				[&]() noexcept -> void
-				{
-					if (auto err = this->end_frame(); !err) [[unlikely]]
-					{
-						// TODO: log err.error();
-					}
-				});
-			return func();
-		}
-
-		template<typename T_FUNC>
-		[[nodiscard]] auto do_imgui(T_FUNC func) noexcept -> mu::leaf::result<void>
-		{
-			MU_LEAF_CHECK(this->begin_imgui());
-
-			auto end_imgui = gsl::finally(
-				[&]() noexcept -> void
-				{
-					if (auto err = this->end_imgui(); !err) [[unlikely]]
-					{
-						// TODO: log err.error();
-					}
-				});
-
-			return func();
-		}
 	};
 
 	namespace details

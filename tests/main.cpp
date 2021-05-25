@@ -170,38 +170,6 @@ static auto app_test_frame(tf::Taskflow& flow, app_stask_state* ts) noexcept -> 
 	return {};
 }
 
-static auto app_test_frame2(std::vector<std::shared_ptr<mu::gfx_window>>& windows, bool& create_new_window) noexcept -> mu::leaf::result<void>
-{
-	for (auto itor = windows.begin(); itor != windows.end();)
-	{
-		auto& wwnd = *itor;
-		if (wwnd)
-		{
-			MU_LEAF_AUTO(wants_to_close, wwnd->wants_to_close());
-
-			if (!wants_to_close) [[likely]]
-			{
-				MU_LEAF_CHECK(wwnd->do_frame(
-					[&]() -> mu::leaf::result<void>
-					{
-						return wwnd->do_imgui(
-							[&]() -> mu::leaf::result<void>
-							{
-								return imgui_test_frame(wwnd, create_new_window);
-							});
-					}));
-				++itor;
-			}
-			else
-			{
-				itor = windows.erase(itor);
-			}
-		}
-	}
-
-	return {};
-}
-
 auto main(int, char**) -> int
 {
 	if (auto app_error = []() -> mu::leaf::result<void>
