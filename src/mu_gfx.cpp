@@ -22,7 +22,7 @@ namespace mu
 		{
 			int m_glfw_status = GLFW_FALSE;
 
-			std::weak_ptr<diligent_globals> m_renderer_globals;
+			//std::weak_ptr<diligent_globals> m_renderer_globals;
 
 			glfw_system()
 			{
@@ -1103,8 +1103,10 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
 			}
 
-			[[nodiscard]] auto new_frame() noexcept -> leaf::result<void>
+			[[nodiscard]] auto new_frame_sync() noexcept -> leaf::result<void>
 			{
+				MU_LEAF_CHECK(m_application_state->make_current());
+				
 				time::moment delta_time;
 				if (m_application_state->m_timer_ready) [[likely]]
 				{
@@ -1206,17 +1208,29 @@ namespace mu
 				return MU_LEAF_NEW_ERROR(gfx_error::not_specified{});
 			}
 
-			virtual [[nodiscard]] auto begin_imgui() noexcept -> mu::leaf::result<void>
+			virtual [[nodiscard]] auto begin_imgui_sync() noexcept -> mu::leaf::result<void>
 			{
 				try
 				{
 					MU_LEAF_CHECK(m_application_state->make_current());
 
-					MU_LEAF_CHECK(new_frame());
-
-					ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+					MU_LEAF_CHECK(new_frame_sync());
 
 					MU_LEAF_CHECK(update_dpi());
+
+					return {};
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+				}
+			}
+
+			virtual [[nodiscard]] auto begin_imgui_async() noexcept -> mu::leaf::result<void>
+			{
+				try
+				{
+					MU_LEAF_CHECK(m_application_state->make_current());
 
 					MU_LEAF_CHECK(m_imgui_shared_resources->create_device_objects(m_dpi_scale, false));
 					ImGuiIO& io		= ImGui::GetIO();
@@ -1231,7 +1245,7 @@ namespace mu
 				}
 			}
 
-			virtual [[nodiscard]] auto end_imgui() noexcept -> mu::leaf::result<void>
+			virtual [[nodiscard]] auto end_imgui_async_1() noexcept -> mu::leaf::result<void>
 			{
 				try
 				{
@@ -1239,7 +1253,36 @@ namespace mu
 
 					ImGui::Render();
 					ImGui::EndFrame();
+
+					return {};
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+				}
+			}
+			virtual [[nodiscard]] auto end_imgui_sync() noexcept -> mu::leaf::result<void>
+			{
+				try
+				{
+					MU_LEAF_CHECK(m_application_state->make_current());
+
 					ImGui::UpdatePlatformWindows();
+
+					return {};
+				}
+				catch (...)
+				{
+					return MU_LEAF_NEW_ERROR(mu::gfx_error::not_specified{});
+				}
+			}
+
+			virtual [[nodiscard]] auto end_imgui_async_2() noexcept -> mu::leaf::result<void>
+			{
+				try
+				{
+					MU_LEAF_CHECK(m_application_state->make_current());
+
 					// ImGuiIO& io = ImGui::GetIO();
 					MU_LEAF_CHECK(render(ImGui::GetDrawData()));
 

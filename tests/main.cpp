@@ -128,45 +128,191 @@ struct app_stask_state
 {
 	std::vector<std::shared_ptr<mu::gfx_window>>& windows;
 	bool&										  create_new_window;
-	std::atomic<std::uint32_t>					  m_window_task_counter;
+	std::array<std::atomic<std::uint32_t>, 8>	  m_window_task_counters;
 };
 
-static auto app_test_frame(tf::Taskflow& flow, app_stask_state* ts) noexcept -> mu::leaf::result<void>
+static auto app_test_frame(tf::Executor* executor, app_stask_state* ts) noexcept -> mu::leaf::result<void>
 {
-	// TODO: make task preceded by the previous frame's task
-	for (auto itor = ts->windows.begin(); itor != ts->windows.end();)
+	for (auto& cnt : ts->m_window_task_counters)
 	{
-		auto& wwnd = *itor;
-		if (wwnd)
-		{
-			MU_LEAF_AUTO(wants_to_close, wwnd->wants_to_close());
+		cnt = 0;
+	}
 
-			if (wants_to_close) [[unlikely]]
-			{
-				itor = ts->windows.erase(itor);
-			}
-			else
-			{
-				++itor;
-			}
+	tf::Taskflow stage_1;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		stage_1
+			.emplace(
+				[ts]()
+				{
+					if (auto func_error = [&]() -> mu::leaf::result<void>
+						{
+							auto  n	   = ts->m_window_task_counters[0]++;
+							auto& wwnd = ts->windows[n];
+							MU_LEAF_CHECK(wwnd->begin_frame());
+							return {};
+						}();
+						!func_error) [[unlikely]]
+					{
+						// log error func_error.get_error_id().value();
+					}
+				})
+			.name("begin_frame");
+	}
+	executor->run(stage_1).wait();
+
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		{
+			auto  n	   = ts->m_window_task_counters[1]++;
+			auto& wwnd = ts->windows[n];
+			MU_LEAF_CHECK(wwnd->begin_imgui_sync());
+		}
+		{
+			auto  n	   = ts->m_window_task_counters[2]++;
+			auto& wwnd = ts->windows[n];
+			MU_LEAF_CHECK(wwnd->begin_imgui_async());
+		}
+		{
+			auto  n	   = ts->m_window_task_counters[3]++;
+			auto& wwnd = ts->windows[n];
+			MU_LEAF_CHECK(imgui_test_frame(wwnd, ts->create_new_window));
 		}
 	}
-	ts->m_window_task_counter = 0;
 
+	tf::Taskflow stage_2;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		stage_2
+			.emplace(
+				[ts]()
+				{
+					if (auto func_error = [&]() -> mu::leaf::result<void>
+						{
+							{
+								auto  n	   = ts->m_window_task_counters[4]++;
+								auto& wwnd = ts->windows[n];
+								MU_LEAF_CHECK(wwnd->end_imgui_async_1());
+							}
+							return {};
+						}();
+						!func_error) [[unlikely]]
+					{
+						// log error func_error.get_error_id().value();
+					}
+				})
+			.name("begin_end_imgui");
+	}
+	executor->run(stage_2).wait();
+
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		{
+			auto  n	   = ts->m_window_task_counters[5]++;
+			auto& wwnd = ts->windows[n];
+			MU_LEAF_CHECK(wwnd->end_imgui_sync());
+		}
+		{
+			auto  n	   = ts->m_window_task_counters[6]++;
+			auto& wwnd = ts->windows[n];
+			MU_LEAF_CHECK(wwnd->end_imgui_async_2());
+		}
+	}
+
+	tf::Taskflow stage_3;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		stage_3
+			.emplace(
+				[ts]()
+				{
+					if (auto func_error = [&]() -> mu::leaf::result<void>
+						{
+							{
+								auto  n	   = ts->m_window_task_counters[7]++;
+								auto& wwnd = ts->windows[n];
+								MU_LEAF_CHECK(wwnd->end_frame());
+							}
+							return {};
+						}();
+						!func_error) [[unlikely]]
+					{
+						// log error func_error.get_error_id().value();
+					}
+				})
+			.name("end_imgui_end_frame");
+	}
+	executor->run(stage_3).wait();
+
+	//for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	//{
+	//}
+	
+#if 0
+	ts->m_window_task_counter = 0;
 	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
 	{
 		auto  n	   = ts->m_window_task_counter++;
 		auto& wwnd = ts->windows[n];
-		if (wwnd)
-		{
-			MU_LEAF_CHECK(wwnd->begin_frame());
-			MU_LEAF_CHECK(wwnd->begin_imgui());
-			MU_LEAF_CHECK(imgui_test_frame(wwnd, ts->create_new_window));
-			MU_LEAF_CHECK(wwnd->end_imgui());
-			MU_LEAF_CHECK(wwnd->end_frame());
-		}
+		MU_LEAF_CHECK(wwnd->begin_frame());
 	}
 
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->begin_imgui_sync());
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->begin_imgui_async());
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(imgui_test_frame(wwnd, ts->create_new_window));
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->end_imgui_async_1());
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->end_imgui_sync());
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->end_imgui_async_2());
+	}
+
+	ts->m_window_task_counter = 0;
+	for (auto itor = ts->windows.begin(); itor != ts->windows.end(); ++itor)
+	{
+		auto  n	   = ts->m_window_task_counter++;
+		auto& wwnd = ts->windows[n];
+		MU_LEAF_CHECK(wwnd->end_frame());
+	}
+#endif
 	return {};
 }
 
@@ -189,7 +335,6 @@ auto main(int, char**) -> int
 
 			bool create_new_window = false;
 
-			tf::Taskflow flow;
 			tf::Executor executor;
 			while (windows.size() > 0)
 			{
@@ -205,8 +350,27 @@ auto main(int, char**) -> int
 								windows.emplace_back(std::move(*new_wnd_res));
 							}
 						}
+
+						for (auto itor = windows.begin(); itor != windows.end();)
+						{
+							auto& wwnd = *itor;
+							if (wwnd)
+							{
+								MU_LEAF_AUTO(wants_to_close, wwnd->wants_to_close());
+
+								if (wants_to_close) [[unlikely]]
+								{
+									itor = windows.erase(itor);
+								}
+								else
+								{
+									++itor;
+								}
+							}
+						}
+
 						auto ts = app_stask_state{windows, create_new_window};
-						return app_test_frame(flow, &ts);
+						return app_test_frame(&executor, &ts);
 					}));
 			}
 			return {};
