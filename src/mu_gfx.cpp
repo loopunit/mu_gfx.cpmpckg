@@ -243,6 +243,7 @@ namespace mu
 			[[nodiscard]] auto create_window(ImGuiViewport* viewport, int posX, int posY, int sizeX, int sizeY) noexcept -> leaf::result<GLFWwindow*>
 			try
 			{
+				// TODO: re-enable when rendering is implemented
 				//glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 				//glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 				//glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
